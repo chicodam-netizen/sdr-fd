@@ -15,7 +15,7 @@ function isManager() {
 }
 
 // ---------- Envio ao funil (comum às duas fontes) ----------
-async function openSendDialog(count, buildPayload, onDone) {
+export async function openSendDialog(count, buildPayload, onDone, endpoint = "/sourcing/import") {
   const [p, a] = await Promise.all([api("GET", "/pipelines"), api("GET", "/agents")]);
   if (!p.ok) return toast(errorMessage(p.data), "error");
   const pipelines = p.data.pipelines;
@@ -41,7 +41,7 @@ async function openSendDialog(count, buildPayload, onDone) {
     dialog.querySelector("[name=stageId]").innerHTML = stageOpts();
   });
   bindForm(dialog.querySelector("form"), async (fd) => {
-    const r = await api("POST", "/sourcing/import", {
+    const r = await api("POST", endpoint, {
       ...buildPayload(),
       pipelineId: fd.get("pipelineId"),
       stageId: fd.get("stageId"),

@@ -411,3 +411,11 @@ code { font-family: Consolas, monospace; font-size: 0.85em; background: #0a1830;
   .filters-grid { grid-template-columns: 1fr; }
   .filters-grid .span-2 { grid-column: auto; }
 }
+
+/* Base de leads em escala */
+.lead-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px; }
+.lead-filters select { width: auto; max-width: 230px; }
+.lead-filters .search { min-width: 220px; }
+.inline-num { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.88rem; }
+.inline-num input { width: 80px; }
+.link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 0.85rem; padding: 0 4px; text-decoration: underline; }

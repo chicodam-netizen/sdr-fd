@@ -8,7 +8,9 @@
     "migrate": "node --env-file=.env.local scripts/migrate.js",
     "seed": "node --env-file=.env.local scripts/seed.js",
     "test": "node --env-file=.env.local --test \"tests/*.test.js\"",
-    "inbox": "node --env-file=.env.local scripts/inbox.js"
+    "inbox": "node --env-file=.env.local scripts/inbox.js",
+    "discover": "node --env-file=.env.local scripts/discover.js",
+    "import-rmbh": "node --env-file=.env.local scripts/import-planilha-rmbh.js"
   },
   "engines": {
     "node": ">=20"
@@ -16,6 +18,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
     "bcryptjs": "^2.4.3",
+    "exceljs": "^4.4.0",
     "imapflow": "^2.11.0",
     "mailparser": "^3.14.2",
     "nodemailer": "^10.0.0",
