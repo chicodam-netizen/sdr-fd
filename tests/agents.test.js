@@ -73,14 +73,14 @@ after(async () => {
   await getPool().end();
 });
 
-test("só gestor/admin cria agente; autonomia só em modo rascunho", async () => {
+test("só gestor/admin cria agente; autonomia validada", async () => {
   const payload = { name: "Ana SDR", senderName: "Ana", senderTitle: "Consultora", objective: "Agendar diagnóstico", dailyLimit: 2 };
   assert.equal((await sdr("POST", "/agents", payload)).status, 403);
   const r = await gestor("POST", "/agents", payload);
   assert.equal(r.status, 201);
   agent = r.data.agent;
   assert.equal(agent.autonomy, "draft");
-  assert.equal((await gestor("PATCH", `/agents/${agent.id}`, { autonomy: "auto" })).data.error, "autonomy_not_available");
+  assert.equal((await gestor("PATCH", `/agents/${agent.id}`, { autonomy: "turbo" })).data.error, "invalid_autonomy");
 });
 
 test("base de conhecimento: compartilhada + do agente aparecem na ficha do agente", async () => {

@@ -29,6 +29,7 @@ export async function openSendDialog(count, buildPayload, onDone, endpoint = "/s
       <label>Funil<select name="pipelineId">${options(pipelines.map((x) => ({ value: x.id, label: escapeHtml(x.name) })), pipeline.id)}</select></label>
       <label>Etapa de entrada<select name="stageId">${stageOpts()}</select></label>
       <label>Agente SDR (opcional)<select name="agentId">${options(agents.map((x) => ({ value: x.id, label: escapeHtml(x.name) })), "", { empty: "Definir depois" })}</select></label>
+      <label class="check"><input type="checkbox" name="startCadence" disabled /> Iniciar a cadência do agente (só cards com e-mail de contato)</label>
       <p class="hint">Empresas que já estão neste funil são ignoradas. A origem (fonte e busca) fica registrada em cada empresa.</p>
       <p class="form-error" hidden></p>
       <div class="dialog-actions">
@@ -36,6 +37,11 @@ export async function openSendDialog(count, buildPayload, onDone, endpoint = "/s
         <button type="submit" class="btn btn-primary">Enviar ao funil</button>
       </div>
     </form>`);
+  dialog.querySelector("[name=agentId]").addEventListener("change", (e) => {
+    const cb = dialog.querySelector("[name=startCadence]");
+    cb.disabled = !e.target.value;
+    if (!e.target.value) cb.checked = false;
+  });
   dialog.querySelector("[name=pipelineId]").addEventListener("change", (e) => {
     pipeline = pipelines.find((x) => x.id === e.target.value);
     dialog.querySelector("[name=stageId]").innerHTML = stageOpts();
@@ -46,9 +52,11 @@ export async function openSendDialog(count, buildPayload, onDone, endpoint = "/s
       pipelineId: fd.get("pipelineId"),
       stageId: fd.get("stageId"),
       agentId: fd.get("agentId") || null,
+      startCadence: fd.get("startCadence") === "on",
     });
     if (!r.ok) return errorMessage(r.data);
-    toast(`${r.data.created} empresa(s) enviada(s) ao funil${r.data.alreadyInPipeline ? `; ${r.data.alreadyInPipeline} já estavam lá` : ""}.`, "success");
+    const cad = r.data.cadence ? ` Cadência iniciada em ${r.data.cadence.enrolled}${Object.values(r.data.cadence.skipped).reduce((a, b) => a + b, 0) ? ` (${Object.values(r.data.cadence.skipped).reduce((a, b) => a + b, 0)} sem e-mail/fora)` : ""}.` : "";
+    toast(`${r.data.created} empresa(s) enviada(s) ao funil${r.data.alreadyInPipeline ? `; ${r.data.alreadyInPipeline} já estavam lá` : ""}.${cad}`, "success");
     dialog.close();
     onDone();
     return null;

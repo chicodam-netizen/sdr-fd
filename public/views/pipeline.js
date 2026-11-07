@@ -35,6 +35,7 @@ function cardHtml(d) {
     ${d.contact ? `<div class="deal-card-contact"><i data-lucide="user"></i>${escapeHtml(d.contact.name)}${d.contact.optOut ? ` <span class="badge badge-danger">opt-out</span>` : ""}</div>` : ""}
     <div class="deal-card-foot">
       <span class="deal-card-value">${formatMoney(d.value)}</span>
+      ${d.cadenceStatus ? `<span class="cadence-dot cadence-${d.cadenceStatus}" title="${{ active: "Em cadência", waiting_approval: "Cadência: rascunho aguardando aprovação", paused: "Cadência pausada" }[d.cadenceStatus]}"><i data-lucide="repeat"></i></span>` : ""}
       <span class="deal-card-days" title="Dias nesta etapa">${days}d</span>
       ${d.owner ? `<span class="avatar avatar-sm" title="${escapeHtml(d.owner.name)}">${escapeHtml(d.owner.name.charAt(0).toUpperCase())}</span>` : ""}
     </div>

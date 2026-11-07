@@ -109,6 +109,51 @@ function openKnowledgeEditor(item, { agentId, scope, readOnly, onSaved }) {
   });
 }
 
+// Editor dos passos da cadência do agente (salva a lista inteira).
+async function renderCadenceEditor(box, agentId, canEdit) {
+  const r = await api("GET", `/agents/${agentId}/cadence`);
+  let steps = r.ok ? r.data.steps : [];
+  const draw = () => {
+    box.innerHTML = `
+      <ol class="cadence-steps">${steps
+        .map(
+          (s, i) => `<li data-i="${i}">
+            <div class="cadence-step-head"><strong>Passo ${i + 1}</strong>
+              <label class="inline-num">${i === 0 ? "após a inscrição, em" : "dias depois:"} <input type="number" min="0" max="90" class="step-delay" value="${s.delayDays}" ${canEdit ? "" : "disabled"} /> ${i === 0 ? "dias" : ""}</label>
+              ${canEdit && steps.length > 1 ? `<button class="icon-btn step-remove" title="Remover passo"><i data-lucide="trash-2"></i></button>` : ""}</div>
+            <textarea class="step-instruction" rows="2" placeholder="Orientação para a IA neste passo" ${canEdit ? "" : "disabled"}>${escapeHtml(s.instruction || "")}</textarea>
+          </li>`
+        )
+        .join("")}</ol>
+      ${canEdit ? `<div class="form-actions-inline"><button class="btn btn-secondary btn-sm" id="step-add" ${steps.length >= 10 ? "disabled" : ""}><i data-lucide="plus"></i>Adicionar passo</button>
+        <button class="btn btn-primary btn-sm" id="steps-save">Salvar cadência</button></div>` : ""}`;
+    refreshIcons();
+    const read = () =>
+      [...box.querySelectorAll(".cadence-steps li")].map((li) => ({
+        delayDays: Number(li.querySelector(".step-delay").value),
+        instruction: li.querySelector(".step-instruction").value,
+      }));
+    box.querySelectorAll(".step-remove").forEach((b) =>
+      b.addEventListener("click", () => {
+        steps = read();
+        steps.splice(Number(b.closest("li").dataset.i), 1);
+        draw();
+      })
+    );
+    box.querySelector("#step-add")?.addEventListener("click", () => {
+      steps = [...read(), { delayDays: 3, instruction: "" }];
+      draw();
+    });
+    box.querySelector("#steps-save")?.addEventListener("click", async () => {
+      const res = await api("PUT", `/agents/${agentId}/cadence`, { steps: read() });
+      if (!res.ok) return toast(errorMessage(res.data), "error");
+      steps = read();
+      toast("Cadência salva.", "success");
+    });
+  };
+  draw();
+}
+
 export async function renderAgentEdit(container, { user, query }) {
   const id = query.get("id");
   const canEdit = isManager(user);
@@ -155,12 +200,14 @@ export async function renderAgentEdit(container, { user, query }) {
         <h3 class="span-2 form-section">Envio</h3>
         <label>Modo de autonomia
           <select name="autonomy" ${dis ? "disabled" : ""}>
-            <option value="draft" selected>Rascunho: toda mensagem é aprovada por uma pessoa</option>
-            <option value="semi" disabled>Semiautônomo (em breve)</option>
-            <option value="auto" disabled>Autônomo (em breve)</option>
+            <option value="draft"${a.autonomy === "draft" ? " selected" : ""}>Rascunho: toda mensagem é aprovada por uma pessoa</option>
+            <option value="semi"${a.autonomy === "semi" ? " selected" : ""}>Semiautônomo: aprova o 1º e-mail; follow-ups saem sozinhos</option>
+            <option value="auto"${a.autonomy === "auto" ? " selected" : ""}>Autônomo: todos os passos da cadência saem sozinhos</option>
           </select>
+          <span class="hint">Respostas dos leads sempre param a cadência e vão para um humano.</span>
         </label>
         ${field("Limite de envios por dia", "dailyLimit", a.dailyLimit, { hint: "Protege a reputação do domínio de envio.", disabled: dis })}
+        <label class="check span-2"><input type="checkbox" name="businessHoursOnly"${a.businessHoursOnly !== false ? " checked" : ""}${dis ? " disabled" : ""} /> Enviar só em horário comercial (seg-sex, 8h-18h de Brasília)</label>
         <p class="form-error span-2" hidden></p>
         ${canEdit ? `<div class="span-2"><button type="submit" class="btn btn-primary">${agent ? "Salvar alterações" : "Criar agente"}</button></div>` : ""}
       </form>
@@ -169,6 +216,9 @@ export async function renderAgentEdit(container, { user, query }) {
         <p class="muted small">O agente só pode afirmar o que estiver aqui ou nos dados do lead. Nunca inventa preços, prazos ou cases.</p>
         <div id="kb">${knowledgeHtml(knowledge, agent?.id, canEdit)}</div>
         ${!agent && canEdit ? `<p class="hint mt">Salve o agente para adicionar documentos exclusivos dele.</p>` : ""}
+        ${agent ? `<h2 class="mt">Cadência de follow-up</h2>
+          <p class="muted small">Passos enviados aos cards inscritos. "Dias" conta a partir do envio do passo anterior (o 1º, da inscrição). A cadência para quando o lead responde, pede para sair ou o card é qualificado/desqualificado.</p>
+          <div id="cadence"><p class="muted small">Carregando...</p></div>` : ""}
       </div>
     </div>`;
   refreshIcons();
@@ -202,6 +252,8 @@ export async function renderAgentEdit(container, { user, query }) {
   };
   bindKb();
 
+  if (agent) renderCadenceEditor(container.querySelector("#cadence"), agent.id, canEdit);
+
   if (!canEdit) return;
   bindForm(container.querySelector("#agent-form"), async (fd) => {
     const payload = {
@@ -217,8 +269,13 @@ export async function renderAgentEdit(container, { user, query }) {
       forbidden: fd.get("forbidden"),
       signature: fd.get("signature"),
       dailyLimit: Number(fd.get("dailyLimit")),
-      autonomy: "draft",
+      autonomy: fd.get("autonomy"),
+      businessHoursOnly: fd.get("businessHoursOnly") === "on",
     };
+    if (payload.autonomy !== "draft" && payload.autonomy !== agent?.autonomy &&
+        !confirm(payload.autonomy === "auto"
+          ? "Modo autônomo: os e-mails da cadência serão enviados SEM revisão humana. Confirmar?"
+          : "Modo semiautônomo: depois do 1º e-mail aprovado, os follow-ups serão enviados SEM revisão. Confirmar?")) return "Alteração cancelada.";
     const r = agent ? await api("PATCH", `/agents/${agent.id}`, payload) : await api("POST", "/agents", payload);
     if (!r.ok) return errorMessage(r.data);
     toast(agent ? "Agente salvo." : "Agente criado.", "success");

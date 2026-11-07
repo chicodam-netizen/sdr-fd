@@ -84,6 +84,14 @@ const ERRORS = {
   lookup_unavailable: "Consulta de CNPJ indisponível no momento.",
   lookup_rate_limited: "Limite da consulta de CNPJ atingido; tente em instantes.",
   invalid_source: "Fonte inválida.",
+  already_enrolled: "Este card já está em uma cadência.",
+  deal_closed: "Card já qualificado/desqualificado.",
+  cadence_empty: "A cadência precisa de pelo menos um passo.",
+  invalid_delay: "Intervalo inválido (0 a 90 dias).",
+  too_many_steps: "Máximo de 10 passos.",
+  enrollment_not_running: "Esta cadência não está em andamento.",
+  enrollment_not_paused: "Esta cadência não está pausada.",
+  invalid_autonomy: "Modo de autonomia inválido.",
 };
 
 export function errorMessage(data) {

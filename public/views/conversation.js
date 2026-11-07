@@ -15,11 +15,48 @@ export const CATEGORY_LABELS = {
   other: "Outro",
 };
 const KIND_LABELS = { first: "Primeiro contato", followup: "Follow-up", reply: "Resposta" };
+const ENROLL_STATUS = {
+  active: "Em andamento",
+  waiting_approval: "Aguardando aprovação do rascunho",
+  paused: "Pausada",
+  replied: "Encerrada: o lead respondeu",
+  finished: "Concluída",
+  stopped: "Interrompida",
+};
+const STOP_REASON = {
+  sequence_completed: "todos os passos enviados",
+  qualified: "card qualificado",
+  disqualified: "card desqualificado",
+  opt_out: "contato pediu para sair",
+  contact_without_email: "contato sem e-mail",
+  draft_discarded: "rascunho descartado",
+  paused_by_user: "pausada manualmente",
+  stopped_by_user: "encerrada manualmente",
+  agent_inactive: "agente inativo",
+  daily_limit_reached: "limite diário do agente atingido",
+  lead_replied: "o lead respondeu",
+};
+
+function cadenceHtml(e) {
+  if (!e || ["replied", "finished", "stopped"].includes(e.status)) {
+    const last = e ? `<span class="muted small">Última: ${ENROLL_STATUS[e.status]}${e.stopReason && e.status !== "replied" ? ` (${STOP_REASON[e.stopReason] || e.stopReason})` : ""}.</span>` : "";
+    return `<div class="cadence-box"><div><strong>Cadência</strong> <span class="muted small">não iniciada</span> ${last}</div>
+      <button class="btn btn-secondary btn-sm" data-cad="enroll"><i data-lucide="play"></i>Iniciar cadência</button></div>`;
+  }
+  const next = e.status === "active" && e.nextRunAt ? ` · próximo passo ${formatDateTime(e.nextRunAt)}` : "";
+  return `<div class="cadence-box cadence-on">
+    <div><strong>Cadência</strong> · passo ${e.currentStep} de ${e.totalSteps} · ${ENROLL_STATUS[e.status]}${next}
+      ${e.stopReason && e.status === "paused" ? `<div class="muted small">${STOP_REASON[e.stopReason] || e.stopReason}</div>` : ""}</div>
+    <span class="toolbar-actions">
+      ${e.status === "paused" ? `<button class="btn btn-secondary btn-sm" data-cad="resume"><i data-lucide="play"></i>Retomar</button>` : `<button class="btn btn-secondary btn-sm" data-cad="pause"><i data-lucide="pause"></i>Pausar</button>`}
+      <button class="btn btn-ghost-danger btn-sm" data-cad="stop"><i data-lucide="square"></i>Encerrar</button>
+    </span></div>`;
+}
 const STAGE_KIND_LABELS = { qualified: "Qualificado", disqualified: "Desqualificado", open: "Em andamento" };
 
 function draftHtml(m) {
   return `<div class="msg msg-draft" data-id="${m.id}">
-    <div class="msg-head"><span class="badge badge-warning">Rascunho · ${KIND_LABELS[m.ai?.kind] || "IA"}</span>
+    <div class="msg-head"><span class="badge badge-warning">Rascunho · ${KIND_LABELS[m.ai?.kind] || "IA"}${m.step ? ` · passo ${m.step} da cadência` : ""}</span>
       <span class="muted small">${escapeHtml(m.agentName || "")} · ${formatDateTime(m.createdAt)}${m.ai?.edited ? " · editado" : ""}</span></div>
     ${m.ai?.rationale ? `<p class="msg-rationale"><i data-lucide="sparkles"></i>${escapeHtml(m.ai.rationale)}</p>` : ""}
     <label class="msg-field">Assunto<input class="draft-subject" value="${escapeHtml(m.subject || "")}" maxlength="200" /></label>
@@ -39,7 +76,7 @@ function sentHtml(m) {
       ? `<span class="badge badge-danger">Falhou</span>`
       : m.ai?.simulated
         ? `<span class="badge badge-muted" title="MAIL_ENABLED=false: não saiu de fato">Envio simulado</span>`
-        : `<span class="badge badge-success">Enviado</span>`;
+        : `<span class="badge badge-success">Enviado${m.ai?.autoSent ? " automaticamente" : ""}</span>`;
   const redirected = m.deliveredTo && m.deliveredTo !== m.toEmail ? ` <span class="muted small">(desviado para ${escapeHtml(m.deliveredTo)})</span>` : "";
   return `<div class="msg msg-out">
     <div class="msg-head">${status}<span class="muted small">para ${escapeHtml(m.toEmail || "—")}${redirected} · ${formatDateTime(m.sentAt || m.createdAt)}${m.approvedByName ? ` · aprovado por ${escapeHtml(m.approvedByName)}` : ""}</span></div>
@@ -76,14 +113,16 @@ export async function renderConversation(container, opts) {
   const activeAgents = opts.agents.filter((a) => a.active || a.id === deal.agent?.id);
 
   const draw = async () => {
-    const { ok, data } = await api("GET", `/deals/${opts.dealId}/messages`);
+    const [{ ok, data }, enr] = await Promise.all([api("GET", `/deals/${opts.dealId}/messages`), api("GET", `/deals/${opts.dealId}/enrollment`)]);
     const messages = ok ? data.messages : [];
+    const enrollment = enr.ok ? enr.data.enrollment : null;
     const hasDraft = messages.some((m) => m.status === "draft");
     const optOut = deal.contact?.optOut;
 
     container.innerHTML = `
       ${optOut ? `<div class="notice notice-danger"><i data-lucide="ban"></i>Contato pediu para não ser contatado. Novas mensagens estão bloqueadas.</div>` : ""}
       ${!deal.contact?.email ? `<div class="notice notice-warning">Contato sem e-mail: é possível gerar rascunho, mas não enviar.</div>` : ""}
+      ${cadenceHtml(enrollment)}
       <div class="conv-toolbar">
         <label class="grow">Agente SDR
           <select id="conv-agent">${options(activeAgents.map((a) => ({ value: a.id, label: escapeHtml(a.name) })), deal.agent?.id || "", { empty: activeAgents.length ? "Escolha o agente" : "Nenhum agente cadastrado" })}</select>
@@ -107,7 +146,7 @@ export async function renderConversation(container, opts) {
         <button class="btn btn-secondary btn-sm" id="in-save"><i data-lucide="mail-plus"></i>Registrar e classificar</button>
       </details>`;
     refreshIcons();
-    bind(messages);
+    bind(messages, enrollment);
   };
 
   const busy = (btn, label) => {
@@ -121,7 +160,20 @@ export async function renderConversation(container, opts) {
     refreshIcons();
   };
 
-  const bind = (messages) => {
+  const bind = (messages, enrollment) => {
+    container.querySelectorAll("[data-cad]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const act = b.dataset.cad;
+        if (act === "stop" && !confirm("Encerrar a cadência deste card? Rascunhos pendentes dela serão descartados.")) return;
+        const r = act === "enroll"
+          ? await api("POST", `/deals/${opts.dealId}/enroll`, { agentId: container.querySelector("#conv-agent").value || undefined })
+          : await api("POST", `/enrollments/${enrollment.id}/${act}`, {});
+        if (!r.ok) return toast(errorMessage(r.data), "error");
+        toast({ enroll: "Cadência iniciada.", pause: "Cadência pausada.", resume: "Cadência retomada.", stop: "Cadência encerrada." }[act], "success");
+        opts.onChanged?.();
+        draw();
+      })
+    );
     container.querySelector("#conv-agent").addEventListener("change", async (e) => {
       const r = await api("PATCH", `/deals/${opts.dealId}`, { agentId: e.target.value || null });
       if (!r.ok) return toast(errorMessage(r.data), "error");

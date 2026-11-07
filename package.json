@@ -10,7 +10,8 @@
     "test": "node --env-file=.env.local --test \"tests/*.test.js\"",
     "inbox": "node --env-file=.env.local scripts/inbox.js",
     "discover": "node --env-file=.env.local scripts/discover.js",
-    "import-rmbh": "node --env-file=.env.local scripts/import-planilha-rmbh.js"
+    "import-rmbh": "node --env-file=.env.local scripts/import-planilha-rmbh.js",
+    "cadence": "node --env-file=.env.local scripts/run-cadences.js"
   },
   "engines": {
     "node": ">=20"

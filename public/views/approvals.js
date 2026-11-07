@@ -12,7 +12,7 @@ function itemHtml(m) {
       <div>
         <strong>${escapeHtml(m.company)}</strong>
         <span class="muted small">· ${escapeHtml(m.contact?.name || "sem contato")}${m.contact?.email ? ` &lt;${escapeHtml(m.contact.email)}&gt;` : ""}</span>
-        <div class="muted small">${KIND_LABELS[m.ai?.kind] || "Mensagem"} · ${escapeHtml(m.agentName || "")} · gerado ${formatDateTime(m.createdAt)}${m.createdByName ? ` por ${escapeHtml(m.createdByName)}` : ""}</div>
+        <div class="muted small">${KIND_LABELS[m.ai?.kind] || "Mensagem"}${m.step ? ` · passo ${m.step} da cadência` : ""} · ${escapeHtml(m.agentName || "")} · gerado ${formatDateTime(m.createdAt)}${m.createdByName ? ` por ${escapeHtml(m.createdByName)}` : ""}</div>
       </div>
       <button class="btn btn-secondary btn-sm" data-act="open"><i data-lucide="panel-right-open"></i>Abrir card</button>
     </header>
@@ -87,10 +87,30 @@ export async function renderApprovals(container, { user }) {
     <div class="page-head page-head-row">
       <div><h1>Aprovações <span class="badge" id="approvals-count">…</span></h1>
         <p class="muted">Mensagens escritas pelos agentes aguardando revisão. Edite à vontade antes de aprovar.</p></div>
-      ${["admin", "gestor"].includes(user.role) ? `<button class="btn btn-secondary" id="poll-inbox"><i data-lucide="mail-search"></i>Ler caixa de entrada</button>` : ""}
+      ${["admin", "gestor"].includes(user.role) ? `<span class="toolbar-actions"><button class="btn btn-secondary" id="run-cadences" title="Gera os passos de cadência que já venceram"><i data-lucide="repeat"></i>Processar cadências</button><button class="btn btn-secondary" id="poll-inbox"><i data-lucide="mail-search"></i>Ler caixa de entrada</button></span>` : ""}
     </div>
     <div id="approvals"><p class="muted">Carregando...</p></div>`;
   refreshIcons();
+  container.querySelector("#run-cadences")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = "Processando...";
+    let total = { processed: 0, sent: 0, drafted: 0 };
+    for (let i = 0; i < 10; i++) {
+      const r = await api("POST", "/cadences/run", { limit: 5 });
+      if (!r.ok) {
+        toast(errorMessage(r.data), "error");
+        break;
+      }
+      for (const k of Object.keys(total)) total[k] += r.data[k] || 0;
+      if (!r.data.remainingDue || !r.data.processed) break;
+    }
+    toast(`Cadências: ${total.processed} passo(s) processado(s): ${total.drafted} rascunho(s), ${total.sent} enviado(s) automaticamente.`, "success");
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="repeat"></i>Processar cadências';
+    refreshIcons();
+    load();
+  });
   container.querySelector("#poll-inbox")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;

@@ -70,6 +70,18 @@ Tela **Captação** (`/captacao`), envio direto ao funil (com etapa e agente), o
   "Enriquecer pendentes" em Leads (lotes de 10, para respeitar o limite da BrasilAPI).
 - **LinkedIn**: apenas importação CSV e contato manual (termos de uso proíbem automação).
 
+## Cadências, autonomia e resultados (Fase 5)
+
+- Cada agente tem uma cadência (até 10 passos; padrão 0/3/7/14 dias) editável na ficha do agente.
+- Inscrição: na ficha do card ("Iniciar cadência") ou no envio em lote ao funil (Leads/Captação).
+- Autonomia do agente: **rascunho** (todo passo vai para Aprovações), **semiautônomo** (1º passo aprovado,
+  follow-ups automáticos), **autônomo** (todos automáticos). Respostas de leads nunca são automáticas:
+  a cadência para e um humano assume. Também para em opt-out, sem e-mail ou card qualificado/desqualificado.
+- Envio só em horário comercial (seg-sex 8h-18h de Brasília) por padrão; respeita o limite diário do agente.
+- Processamento: botão "Processar cadências" em Aprovações,  ( para rodar
+  continuamente) ou  com  (4 passos por chamada).
+- **Resultados** (): funil de conversão, cards por etapa, desempenho por agente, atividade diária.
+
 ## Migrações
 
 Arquivos `db/NNN_nome.sql`, aplicados em ordem e registrados em `schema_migrations`.

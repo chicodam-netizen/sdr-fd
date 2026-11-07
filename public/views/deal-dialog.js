@@ -10,16 +10,17 @@ const ACTIVITY_LABEL = {
   owner_change: () => "Responsável alterado",
   note: (a) => `<div class="note-body">${escapeHtml(a.body)}</div>`,
   message_draft: (a) => `Rascunho gerado pela IA (${escapeHtml(a.meta.agent || "agente")})`,
-  message_sent: (a) => `E-mail ${a.meta.simulated ? "aprovado (envio simulado)" : "enviado"}: <strong>${escapeHtml(a.meta.subject || "")}</strong>`,
+  message_sent: (a) => `E-mail ${a.meta.auto ? "enviado automaticamente pela cadência" : a.meta.simulated ? "aprovado (envio simulado)" : "enviado"}${a.meta.step ? ` (passo ${a.meta.step})` : ""}: <strong>${escapeHtml(a.meta.subject || "")}</strong>`,
   message_received: (a) => `Resposta recebida${a.meta.subject ? `: <strong>${escapeHtml(a.meta.subject)}</strong>` : ""}`,
   ai_classification: (a) => `IA classificou: <strong>${escapeHtml(CATEGORY_LABELS[a.meta.category] || a.meta.category)}</strong> — ${escapeHtml(a.meta.summary || "")}`,
   opt_out: () => "Contato marcado como <strong>não contatar</strong> (opt-out)",
   sourced: (a) => `Captado: ${escapeHtml(a.meta.detail || a.meta.source || "")}`,
+  cadence_started: (a) => `Cadência iniciada (${a.meta.steps} passos)`,
 };
 
 const ACTIVITY_ICON = {
   created: "plus", import: "upload", stage_change: "arrow-right-left", owner_change: "user-cog", note: "sticky-note",
-  message_draft: "sparkles", message_sent: "send", message_received: "mail-open", ai_classification: "brain", opt_out: "ban", sourced: "radar",
+  message_draft: "sparkles", message_sent: "send", message_received: "mail-open", ai_classification: "brain", opt_out: "ban", sourced: "radar", cadence_started: "repeat",
 };
 
 function toLocalInput(iso) {
