@@ -1,0 +1,20 @@
+{
+  "name": "sdr-fd",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SDR FD - prospecção B2B com agentes de IA (SPA vanilla + Vercel serverless + Postgres)",
+  "scripts": {
+    "dev": "node --env-file=.env.local scripts/dev-server.js",
+    "migrate": "node --env-file=.env.local scripts/migrate.js",
+    "seed": "node --env-file=.env.local scripts/seed.js",
+    "test": "node --env-file=.env.local --test \"tests/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "nodemailer": "^10.0.0",
+    "pg": "^8.23.1"
+  }
+}
