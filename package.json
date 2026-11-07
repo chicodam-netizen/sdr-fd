@@ -7,13 +7,17 @@
     "dev": "node --env-file=.env.local scripts/dev-server.js",
     "migrate": "node --env-file=.env.local scripts/migrate.js",
     "seed": "node --env-file=.env.local scripts/seed.js",
-    "test": "node --env-file=.env.local --test \"tests/*.test.js\""
+    "test": "node --env-file=.env.local --test \"tests/*.test.js\"",
+    "inbox": "node --env-file=.env.local scripts/inbox.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "bcryptjs": "^2.4.3",
+    "imapflow": "^2.11.0",
+    "mailparser": "^3.14.2",
     "nodemailer": "^10.0.0",
     "pg": "^8.23.1"
   }

@@ -5,10 +5,11 @@ import { api, escapeHtml, refreshIcons, toast, ROLE_LABELS } from "./client.js";
 import { renderLogin, renderForgotPassword, renderResetPassword } from "./views/auth.js";
 import { renderChangePassword } from "./views/change-password.js";
 import { renderDashboard } from "./views/dashboard.js";
-import { renderComingSoon } from "./views/coming-soon.js";
 import { renderPipeline } from "./views/pipeline.js";
 import { renderPipelineConfig } from "./views/pipeline-config.js";
 import { renderLeads } from "./views/leads.js";
+import { renderAgents, renderAgentEdit } from "./views/agents.js";
+import { renderApprovals } from "./views/approvals.js";
 import { renderUsers } from "./views/users.js";
 import { renderProfile } from "./views/profile.js";
 import { renderNotFound } from "./views/notfound.js";
@@ -22,16 +23,14 @@ const routes = {
   "/funil": { render: renderPipeline, label: "Funil", icon: "kanban" },
   "/funil/configurar": { render: renderPipelineConfig, roles: ["admin", "gestor"], nav: "/funil" },
   "/leads": { render: renderLeads, label: "Leads", icon: "building-2" },
-  "/agentes": {
-    render: (c) => renderComingSoon(c, "Agentes SDR", "Persona, base de conhecimento, premissas e cadências de cada agente.", 3),
-    label: "Agentes SDR",
-    icon: "bot",
-  },
+  "/aprovacoes": { render: renderApprovals, label: "Aprovações", icon: "mail-check" },
+  "/agentes": { render: renderAgents, label: "Agentes SDR", icon: "bot" },
+  "/agentes/editar": { render: renderAgentEdit, nav: "/agentes" },
   "/usuarios": { render: renderUsers, label: "Usuários", icon: "users", roles: ["admin", "gestor"] },
   "/perfil": { render: renderProfile },
 };
 
-const NAV = ["/", "/funil", "/leads", "/agentes", "/usuarios"];
+const NAV = ["/", "/funil", "/aprovacoes", "/leads", "/agentes", "/usuarios"];
 
 const session = { user: null };
 

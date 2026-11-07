@@ -11,6 +11,10 @@ export async function renderDashboard(container, { user }) {
     { label: "Qualificados", value: n(s.qualified), icon: "badge-check", note: s.qualified_30d !== undefined ? `${n(s.qualified_30d)} nos últimos 30 dias` : "" },
     { label: "Desqualificados", value: n(s.disqualified), icon: "circle-x" },
     { label: "Empresas na base", value: n(s.companies), icon: "building-2", href: "#/leads" },
+    { label: "Aguardando aprovação", value: n(s.pending_approval), icon: "mail-check", href: "#/aprovacoes" },
+    { label: "E-mails enviados (7 dias)", value: n(s.sent_7d), icon: "send" },
+    { label: "Respostas recebidas (7 dias)", value: n(s.replies_7d), icon: "mail-open" },
+    { label: "Agentes ativos", value: n(s.active_agents), icon: "bot", href: "#/agentes" },
   ];
 
   container.innerHTML = `
@@ -33,7 +37,7 @@ export async function renderDashboard(container, { user }) {
       <ol class="roadmap">
         <li class="done">Base do sistema, login e gestão de usuários</li>
         <li class="done">Funil em kanban e lista, cadastro e importação de leads</li>
-        <li>Agentes SDR com base de conhecimento e aprovação humana</li>
+        <li class="done">Agentes SDR com base de conhecimento e aprovação humana</li>
         <li>Captação de leads (CNPJ, Google Places, CSV)</li>
         <li>Cadências automáticas e painel de resultados</li>
       </ol>

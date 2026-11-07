@@ -36,6 +36,24 @@ sai: o conteúdo vai para o console e, na tela de usuários, a senha temporária
   colunas; deduplica empresa por CNPJ (ou nome) e contato por e-mail. Exemplo: `tests/exemplo-importacao.csv`.
 - Origem de cada empresa/contato fica registrada (`source`, `source_detail`) e contatos têm opt-out (LGPD).
 
+## Agentes SDR (Fase 3)
+
+- Agente = remetente + persona, objetivo, tom, premissas, critérios de qualificação, proibições,
+  assinatura e limite diário. Base de conhecimento por agente ou compartilhada (texto, .txt/.md).
+- Na ficha do card: escolher o agente → "Gerar rascunho" (Claude, `lib/ai.js`, saída JSON) →
+  revisar/editar → "Aprovar e enviar". Toda mensagem passa por aprovação humana (modo rascunho).
+  Fila geral em **Aprovações**.
+- Envio (`lib/prospect-mailer.js`): `MAIL_ENABLED=false` simula; `MAIL_REDIRECT_TO` desvia TODO
+  e-mail para o endereço de teste (assunto `[TESTE → lead@...]`). Rodapé de descadastro automático.
+  Bloqueia contato com opt-out, sem e-mail ou acima do limite diário do agente.
+- Respostas: colar manualmente na ficha ("Registrar resposta recebida") ou ler a caixa via IMAP
+  (`npm run inbox`, botão "Ler caixa de entrada" em Aprovações, ou `GET /api/cron/inbox` com
+  `CRON_SECRET`). Associação pelo In-Reply-To/References (ou remetente). A IA classifica
+  (interessado, reunião, objeção, sair...) e sugere etapa; "SAIR" marca opt-out na hora.
+- Cron na Vercel: o plano Hobby só permite cron diário; para ler a caixa a cada poucos minutos é
+  preciso plano Pro ou um agendador externo chamando `/api/cron/inbox`.
+- Testes usam `AI_FAKE=1` (sem chamar a API).
+
 ## Migrações
 
 Arquivos `db/NNN_nome.sql`, aplicados em ordem e registrados em `schema_migrations`.

@@ -1,6 +1,7 @@
 // Ficha do card: dados do negócio, contato, empresa, anotações e histórico.
 import { api, errorMessage, escapeHtml, formatDateTime, formatCnpj, refreshIcons, toast } from "../client.js";
 import { openDialog, bindForm, options } from "../ui.js";
+import { renderConversation, CATEGORY_LABELS } from "./conversation.js";
 
 const ACTIVITY_LABEL = {
   created: () => "Card criado",
@@ -8,9 +9,17 @@ const ACTIVITY_LABEL = {
   stage_change: (a) => `Movido de <strong>${escapeHtml(a.meta.from || "?")}</strong> para <strong>${escapeHtml(a.meta.to)}</strong>`,
   owner_change: () => "Responsável alterado",
   note: (a) => `<div class="note-body">${escapeHtml(a.body)}</div>`,
+  message_draft: (a) => `Rascunho gerado pela IA (${escapeHtml(a.meta.agent || "agente")})`,
+  message_sent: (a) => `E-mail ${a.meta.simulated ? "aprovado (envio simulado)" : "enviado"}: <strong>${escapeHtml(a.meta.subject || "")}</strong>`,
+  message_received: (a) => `Resposta recebida${a.meta.subject ? `: <strong>${escapeHtml(a.meta.subject)}</strong>` : ""}`,
+  ai_classification: (a) => `IA classificou: <strong>${escapeHtml(CATEGORY_LABELS[a.meta.category] || a.meta.category)}</strong> — ${escapeHtml(a.meta.summary || "")}`,
+  opt_out: () => "Contato marcado como <strong>não contatar</strong> (opt-out)",
 };
 
-const ACTIVITY_ICON = { created: "plus", import: "upload", stage_change: "arrow-right-left", owner_change: "user-cog", note: "sticky-note" };
+const ACTIVITY_ICON = {
+  created: "plus", import: "upload", stage_change: "arrow-right-left", owner_change: "user-cog", note: "sticky-note",
+  message_draft: "sparkles", message_sent: "send", message_received: "mail-open", ai_classification: "brain", opt_out: "ban",
+};
 
 function toLocalInput(iso) {
   if (!iso) return "";
@@ -51,6 +60,11 @@ function bodyHtml(deal, activities, ctx) {
     </header>
     <div class="drawer-body">
       <label class="stage-picker">Etapa<select id="deal-stage">${stageOpts}</select></label>
+
+      <section class="drawer-section">
+        <h3>Conversa por e-mail</h3>
+        <div id="conversation"><p class="muted small">Carregando...</p></div>
+      </section>
 
       <section class="drawer-section">
         <h3>Negócio</h3>
@@ -113,6 +127,10 @@ export async function openDeal(dealId, ctx) {
     return;
   }
   let { deal, activities } = data;
+  // Na fila de aprovações o funil vem pela lista de funis.
+  if (!ctx.pipeline && ctx.pipelines) ctx = { ...ctx, pipeline: ctx.pipelines.find((p) => p.id === deal.pipelineId) };
+  const agentsRes = await api("GET", "/agents");
+  const agents = agentsRes.ok ? agentsRes.data.agents : [];
 
   const reloadTimeline = async () => {
     const r = await api("GET", `/deals/${dealId}`);
@@ -126,6 +144,23 @@ export async function openDeal(dealId, ctx) {
   dialog.innerHTML = bodyHtml(deal, activities, ctx);
   refreshIcons();
   dialog.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => dialog.close()));
+
+  renderConversation(dialog.querySelector("#conversation"), {
+    dealId,
+    deal,
+    agents,
+    pipeline: ctx.pipeline,
+    onDealChange: (d) => {
+      deal = d;
+      dialog.querySelector("#deal-stage").value = d.stageId;
+      ctx.onChange?.(d);
+      reloadTimeline();
+    },
+    onChanged: () => {
+      reloadTimeline();
+      ctx.onMessagesChanged?.();
+    },
+  });
 
   dialog.querySelector("#deal-stage").addEventListener("change", async (e) => {
     const r = await api("POST", `/deals/${dealId}/move`, { stageId: e.target.value });
