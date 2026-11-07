@@ -1,11 +1,33 @@
 // Base de leads: empresas e seus contatos (edição, novo contato, opt-out).
-import { api, errorMessage, escapeHtml, formatDate, formatCnpj, refreshIcons, toast } from "../client.js";
+import { api, errorMessage, escapeHtml, formatDate, formatCnpj, formatMoney, refreshIcons, toast } from "../client.js";
 import { openDialog, bindForm } from "../ui.js";
 
 let state;
 
+const SOURCE_LABEL = { csv: "CSV", receita_cnpj: "Base CNPJ", google_places: "Google Maps", manual: "Manual" };
+const SIZE_LABEL = { micro: "Microempresa", pequeno: "Pequeno porte", demais: "Médio/grande porte", nao_informado: "Não informado" };
+
 function sourceLabel(c) {
-  return c.source === "csv" ? `CSV: ${c.sourceDetail || ""}` : "Manual";
+  if (c.source === "csv") return `CSV: ${c.sourceDetail || ""}`;
+  if (c.source === "google_places") return c.sourceDetail || "Google Maps";
+  return SOURCE_LABEL[c.source] || c.source || "Manual";
+}
+
+function registrationHtml(c) {
+  if (!c.cnpj) return `<p class="muted small">Sem CNPJ: informe o CNPJ acima para enriquecer os dados cadastrais.</p>`;
+  if (!c.enrichedAt) return `<p class="muted small">Dados cadastrais ainda não consultados.</p>`;
+  if (c.enrichment?.error) return `<p class="muted small">CNPJ não encontrado na consulta de ${formatDate(c.enrichedAt)}.</p>`;
+  const e = c.enrichment || {};
+  const inactive = c.registrationStatus && c.registrationStatus !== "ativa";
+  return `<dl class="details">
+    <dt>Razão social</dt><dd>${escapeHtml(c.legalName || "—")}</dd>
+    <dt>Situação</dt><dd>${inactive ? `<span class="badge badge-danger">${escapeHtml(c.registrationStatus)}</span>` : escapeHtml(c.registrationStatus || "—")}</dd>
+    <dt>Atividade</dt><dd>${escapeHtml([c.cnaeCode, e.cnaeDescription].filter(Boolean).join(" · ") || "—")}</dd>
+    <dt>Porte</dt><dd>${escapeHtml(SIZE_LABEL[c.size] || "—")}</dd>
+    <dt>Abertura</dt><dd>${c.openedAt ? formatDate(c.openedAt) : "—"}</dd>
+    <dt>Capital social</dt><dd>${e.capital ? formatMoney(e.capital) : "—"}</dd>
+    <dt>Consulta</dt><dd class="muted small">${e.source === "brasilapi" ? "BrasilAPI" : "Base CNPJ local"} · ${formatDate(c.enrichedAt)}</dd>
+  </dl>`;
 }
 
 function tableHtml() {
@@ -18,7 +40,7 @@ function tableHtml() {
     <tbody>${state.companies
       .map(
         (c) => `<tr data-id="${c.id}">
-          <td data-label="Empresa"><strong>${escapeHtml(c.name)}</strong></td>
+          <td data-label="Empresa"><strong>${escapeHtml(c.name)}</strong>${c.registrationStatus && c.registrationStatus !== "ativa" ? ` <span class="badge badge-danger">${escapeHtml(c.registrationStatus)}</span>` : ""}</td>
           <td data-label="CNPJ">${escapeHtml(formatCnpj(c.cnpj)) || "—"}</td>
           <td data-label="Cidade/UF">${escapeHtml([c.city, c.uf].filter(Boolean).join("/")) || "—"}</td>
           <td data-label="Segmento">${escapeHtml(c.segment || "—")}</td>
@@ -100,6 +122,10 @@ async function openCompany(id) {
           </form>
         </section>
         <section class="drawer-section">
+          <div class="section-head"><h3>Dados cadastrais (Receita)</h3>${c.cnpj ? `<button class="btn btn-secondary btn-sm" id="enrich-btn"><i data-lucide="refresh-cw"></i>${c.enrichedAt ? "Atualizar" : "Consultar CNPJ"}</button>` : ""}</div>
+          ${registrationHtml(c)}
+        </section>
+        <section class="drawer-section">
           <div class="section-head"><h3>Contatos</h3><button class="btn btn-secondary btn-sm" id="add-contact"><i data-lucide="user-plus"></i>Novo contato</button></div>
           <div id="new-contact"></div>
           ${
@@ -141,6 +167,18 @@ async function openCompany(id) {
       return null;
     });
 
+    dialog.querySelector("#enrich-btn")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const r = await api("POST", `/companies/${id}/enrich`, {});
+      if (!r.ok) {
+        btn.disabled = false;
+        return toast(errorMessage(r.data), "error");
+      }
+      toast("Dados cadastrais atualizados.", "success");
+      render();
+    });
+
     dialog.querySelector("#add-contact").addEventListener("click", () => {
       const holder = dialog.querySelector("#new-contact");
       holder.innerHTML = contactForm();
@@ -174,11 +212,37 @@ async function openCompany(id) {
   await render();
 }
 
-export async function renderLeads(container, { query }) {
+async function enrichPending(btn) {
+  btn.disabled = true;
+  let total = 0;
+  for (;;) {
+    btn.textContent = `Consultando CNPJs... ${total}`;
+    const r = await api("POST", "/companies/enrich-pending", {});
+    if (!r.ok) {
+      toast(errorMessage(r.data), "error");
+      break;
+    }
+    total += r.data.done;
+    const blocked = !r.data.done && r.data.errors.some((e) => e.error !== "cnpj_not_found");
+    if (!r.data.remaining || blocked) {
+      if (r.data.remaining) toast(`Consulta pausada (limite ou indisponibilidade da BrasilAPI). Faltam ${r.data.remaining}.`, "warning");
+      break;
+    }
+  }
+  toast(`${total} empresa(s) enriquecida(s).`, "success");
+  btn.disabled = false;
+  btn.innerHTML = `<i data-lucide="refresh-cw"></i>Enriquecer pendentes`;
+  refreshIcons();
+  load();
+}
+
+export async function renderLeads(container, { query, user }) {
   state = { container, companies: [], q: "" };
   container.innerHTML = `
     <div class="page-head"><h1>Leads</h1><p class="muted">Base de empresas e contatos. Para colocar no funil, use "Novo lead" ou "Importar CSV" no Funil.</p></div>
-    <div class="toolbar"><div class="search"><i data-lucide="search"></i><input id="company-search" type="search" placeholder="Buscar por nome, CNPJ, cidade, segmento..." /></div></div>
+    <div class="toolbar"><div class="search"><i data-lucide="search"></i><input id="company-search" type="search" placeholder="Buscar por nome, CNPJ, cidade, segmento..." /></div>
+      <a class="btn btn-secondary" href="#/captacao"><i data-lucide="radar"></i>Captar leads</a>
+      ${["admin", "gestor"].includes(user.role) ? `<button class="btn btn-secondary" id="enrich-pending" title="Consulta na Receita as empresas com CNPJ ainda não consultadas"><i data-lucide="refresh-cw"></i>Enriquecer pendentes</button>` : ""}</div>
     <div id="companies"><p class="muted">Carregando...</p></div>`;
   refreshIcons();
   let timer;
@@ -189,6 +253,7 @@ export async function renderLeads(container, { query }) {
       load();
     }, 250);
   });
+  container.querySelector("#enrich-pending")?.addEventListener("click", (e) => enrichPending(e.currentTarget));
   await load();
   const open = query.get("empresa");
   if (open) openCompany(open);

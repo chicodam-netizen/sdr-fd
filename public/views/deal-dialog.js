@@ -14,11 +14,12 @@ const ACTIVITY_LABEL = {
   message_received: (a) => `Resposta recebida${a.meta.subject ? `: <strong>${escapeHtml(a.meta.subject)}</strong>` : ""}`,
   ai_classification: (a) => `IA classificou: <strong>${escapeHtml(CATEGORY_LABELS[a.meta.category] || a.meta.category)}</strong> — ${escapeHtml(a.meta.summary || "")}`,
   opt_out: () => "Contato marcado como <strong>não contatar</strong> (opt-out)",
+  sourced: (a) => `Captado: ${escapeHtml(a.meta.detail || a.meta.source || "")}`,
 };
 
 const ACTIVITY_ICON = {
   created: "plus", import: "upload", stage_change: "arrow-right-left", owner_change: "user-cog", note: "sticky-note",
-  message_draft: "sparkles", message_sent: "send", message_received: "mail-open", ai_classification: "brain", opt_out: "ban",
+  message_draft: "sparkles", message_sent: "send", message_received: "mail-open", ai_classification: "brain", opt_out: "ban", sourced: "radar",
 };
 
 function toLocalInput(iso) {

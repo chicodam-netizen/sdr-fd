@@ -38,7 +38,7 @@ export async function renderDashboard(container, { user }) {
         <li class="done">Base do sistema, login e gestão de usuários</li>
         <li class="done">Funil em kanban e lista, cadastro e importação de leads</li>
         <li class="done">Agentes SDR com base de conhecimento e aprovação humana</li>
-        <li>Captação de leads (CNPJ, Google Places, CSV)</li>
+        <li class="done">Captação de leads (CNPJ, Google Maps, CSV)</li>
         <li>Cadências automáticas e painel de resultados</li>
       </ol>
     </div>`;

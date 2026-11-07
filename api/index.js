@@ -17,6 +17,7 @@ const routeDefs = [
   ...require("../lib/routes/agents").routes,
   ...require("../lib/routes/messages"),
   ...require("../lib/routes/inbox"),
+  ...require("../lib/routes/sourcing"),
 ];
 
 // "/users/:id" -> /^\/users\/(?<id>uuid)$/  (parâmetros são sempre UUID)

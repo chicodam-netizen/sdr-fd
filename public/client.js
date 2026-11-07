@@ -74,6 +74,16 @@ const ERRORS = {
   imap_not_configured: "Leitura da caixa de e-mail não configurada (IMAP).",
   send_failed: "Falha ao enviar o e-mail.",
   smtp_not_configured: "Envio de e-mail não configurado (SMTP).",
+  missing_filters: "Escolha ao menos UF, atividade (CNAE) ou nome.",
+  places_not_configured: "Google Maps não configurado (GOOGLE_PLACES_API_KEY).",
+  places_unavailable: "Google Maps indisponível no momento.",
+  places_rate_limited: "Limite de consultas do Google Maps atingido.",
+  places_error: "Erro na consulta ao Google Maps.",
+  missing_cnpj: "Empresa sem CNPJ.",
+  cnpj_not_found: "CNPJ não encontrado na Receita.",
+  lookup_unavailable: "Consulta de CNPJ indisponível no momento.",
+  lookup_rate_limited: "Limite da consulta de CNPJ atingido; tente em instantes.",
+  invalid_source: "Fonte inválida.",
 };
 
 export function errorMessage(data) {

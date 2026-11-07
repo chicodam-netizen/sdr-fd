@@ -10,6 +10,7 @@ import { renderPipelineConfig } from "./views/pipeline-config.js";
 import { renderLeads } from "./views/leads.js";
 import { renderAgents, renderAgentEdit } from "./views/agents.js";
 import { renderApprovals } from "./views/approvals.js";
+import { renderSourcing } from "./views/sourcing.js";
 import { renderUsers } from "./views/users.js";
 import { renderProfile } from "./views/profile.js";
 import { renderNotFound } from "./views/notfound.js";
@@ -23,6 +24,7 @@ const routes = {
   "/funil": { render: renderPipeline, label: "Funil", icon: "kanban" },
   "/funil/configurar": { render: renderPipelineConfig, roles: ["admin", "gestor"], nav: "/funil" },
   "/leads": { render: renderLeads, label: "Leads", icon: "building-2" },
+  "/captacao": { render: renderSourcing, label: "Captação", icon: "radar" },
   "/aprovacoes": { render: renderApprovals, label: "Aprovações", icon: "mail-check" },
   "/agentes": { render: renderAgents, label: "Agentes SDR", icon: "bot" },
   "/agentes/editar": { render: renderAgentEdit, nav: "/agentes" },
@@ -30,7 +32,7 @@ const routes = {
   "/perfil": { render: renderProfile },
 };
 
-const NAV = ["/", "/funil", "/aprovacoes", "/leads", "/agentes", "/usuarios"];
+const NAV = ["/", "/funil", "/aprovacoes", "/leads", "/captacao", "/agentes", "/usuarios"];
 
 const session = { user: null };
 

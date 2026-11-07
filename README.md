@@ -54,6 +54,22 @@ sai: o conteúdo vai para o console e, na tela de usuários, a senha temporária
   preciso plano Pro ou um agendador externo chamando `/api/cron/inbox`.
 - Testes usam `AI_FAKE=1` (sem chamar a API).
 
+## Captação de leads (Fase 4)
+
+Tela **Captação** (`/captacao`), envio direto ao funil (com etapa e agente), origem registrada em cada empresa.
+
+- **Base CNPJ (Receita Federal, dados abertos)**: recorte carregado por script, sem dados de sócios.
+  Baixe os .zip oficiais (Cnaes, Municipios, Estabelecimentos0..9, Empresas0..9) numa pasta e rode:
+  `node --env-file=.env.local scripts/load-cnpj.js --dir PASTA --uf MG,SP --cnae 10,62`
+  (`--cnae` aceita prefixos: `10` = toda a divisão; padrão só empresas ativas; `--incluir-inativas`).
+  Busca por UF, município, CNAE, porte, nome, com e-mail/telefone, matriz e "fora da minha base".
+- **Google Maps (Places API New, oficial)**: `GOOGLE_PLACES_API_KEY`; cobrança por uso no Google Cloud.
+  Deduplica pelo place_id.
+- **Enriquecimento por CNPJ**: base local primeiro, depois BrasilAPI (gratuita, exige User-Agent).
+  Só preenche campos vazios; descarta o quadro de sócios (LGPD). Botão na ficha da empresa e
+  "Enriquecer pendentes" em Leads (lotes de 10, para respeitar o limite da BrasilAPI).
+- **LinkedIn**: apenas importação CSV e contato manual (termos de uso proíbem automação).
+
 ## Migrações
 
 Arquivos `db/NNN_nome.sql`, aplicados em ordem e registrados em `schema_migrations`.
