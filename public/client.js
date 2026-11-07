@@ -38,6 +38,20 @@ const ERRORS = {
   user_inactive: "Usuário inativo.",
   forbidden: "Você não tem permissão para esta ação.",
   unauthorized: "Sua sessão expirou. Entre novamente.",
+  missing_company_name: "Informe o nome da empresa.",
+  invalid_cnpj: "CNPJ inválido (precisa ter 14 dígitos).",
+  invalid_value: "Valor inválido.",
+  invalid_owner: "Responsável inválido.",
+  invalid_stage_id: "Etapa inválida.",
+  cnpj_in_use: "Já existe uma empresa com esse CNPJ.",
+  missing_contact_name: "Informe o nome ou e-mail do contato.",
+  stage_not_empty: "Esta etapa tem cards. Mova-os antes de excluir.",
+  last_stage: "O funil precisa de pelo menos uma etapa.",
+  last_pipeline: "É preciso manter pelo menos um funil ativo.",
+  too_many_rows: "Máximo de 2.000 linhas por importação.",
+  missing_rows: "Nenhuma linha para importar.",
+  not_found: "Registro não encontrado.",
+  missing_body: "Escreva a anotação.",
 };
 
 export function errorMessage(data) {
@@ -90,5 +104,39 @@ export function mailToast(result, okText) {
     toast(`${okText} Falha ao enviar o e-mail.`, "error");
   }
 }
+
+const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+export function formatMoney(value) {
+  return value === null || value === undefined ? "" : money.format(value);
+}
+
+export function formatDate(iso) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(iso));
+}
+
+export function daysSince(iso) {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+}
+
+export function formatCnpj(d) {
+  return d && d.length === 14 ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}` : d || "";
+}
+
+// Preferências locais do usuário (visão do funil etc.). Falha silenciosa sem storage.
+export const prefs = {
+  get(key, fallback) {
+    try {
+      return localStorage.getItem(`sdr.${key}`) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(`sdr.${key}`, value);
+    } catch {}
+  },
+};
 
 export const PASSWORD_HINT = "Mínimo de 10 caracteres, com letras e números.";

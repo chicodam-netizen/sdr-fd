@@ -27,6 +27,15 @@ npm test          # testes de integração da API contra o banco local
 Configuração em `.env.local` (modelo em `.env.example`). Com `MAIL_ENABLED=false` nenhum e-mail
 sai: o conteúdo vai para o console e, na tela de usuários, a senha temporária é exibida ao admin.
 
+## CRM (Fase 2)
+
+- Funis com etapas customizáveis (`/funil/configurar`): nome, cor, ordem e tipo
+  (em andamento / qualificado / desqualificado). Toda organização nova recebe o funil padrão.
+- Funil em kanban (arrastar e soltar via SortableJS) ou lista; ficha do card com anotações e histórico.
+- Importação CSV no navegador (UTF-8 ou Windows-1252 do Excel, `;` ou `,`), com mapeamento de
+  colunas; deduplica empresa por CNPJ (ou nome) e contato por e-mail. Exemplo: `tests/exemplo-importacao.csv`.
+- Origem de cada empresa/contato fica registrada (`source`, `source_detail`) e contatos têm opt-out (LGPD).
+
 ## Migrações
 
 Arquivos `db/NNN_nome.sql`, aplicados em ordem e registrados em `schema_migrations`.

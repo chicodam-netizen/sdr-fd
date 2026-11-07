@@ -1,7 +1,8 @@
-// Cria a primeira organização e o primeiro admin, se ainda não existir nenhum usuário.
+// Cria a primeira organização (com o funil padrão) e o primeiro admin, se ainda não existir nenhum usuário.
 // Idempotente: se já houver usuários, não faz nada.
 const { getPool } = require("../lib/db");
 const { hashPassword } = require("../lib/auth");
+const { createDefaultPipeline } = require("../lib/default-pipeline");
 
 async function main() {
   const { SEED_ORG_NAME, SEED_ADMIN_NAME, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD } = process.env;
@@ -25,6 +26,7 @@ async function main() {
        VALUES ($1, $2, $3, $4, 'admin', true)`,
       [org.rows[0].id, SEED_ADMIN_NAME, SEED_ADMIN_EMAIL.toLowerCase(), await hashPassword(SEED_ADMIN_PASSWORD)]
     );
+    await createDefaultPipeline(client, org.rows[0].id);
     await client.query("COMMIT");
     console.log(`Organização "${SEED_ORG_NAME}" e admin ${SEED_ADMIN_EMAIL} criados (senha = SEED_ADMIN_PASSWORD do .env.local).`);
   } catch (err) {

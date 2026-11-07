@@ -6,6 +6,9 @@ import { renderLogin, renderForgotPassword, renderResetPassword } from "./views/
 import { renderChangePassword } from "./views/change-password.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { renderComingSoon } from "./views/coming-soon.js";
+import { renderPipeline } from "./views/pipeline.js";
+import { renderPipelineConfig } from "./views/pipeline-config.js";
+import { renderLeads } from "./views/leads.js";
 import { renderUsers } from "./views/users.js";
 import { renderProfile } from "./views/profile.js";
 import { renderNotFound } from "./views/notfound.js";
@@ -16,16 +19,9 @@ const routes = {
   "/redefinir-senha": { render: renderResetPassword, public: true },
   "/trocar-senha": { render: renderChangePassword, bare: true },
   "/": { render: renderDashboard, label: "Início", icon: "layout-dashboard" },
-  "/funil": {
-    render: (c) => renderComingSoon(c, "Funil de vendas", "Kanban e lista com arrastar e soltar, etapas customizáveis.", 2),
-    label: "Funil",
-    icon: "kanban",
-  },
-  "/leads": {
-    render: (c) => renderComingSoon(c, "Leads", "Empresas e contatos, importação CSV e histórico de atividades.", 2),
-    label: "Leads",
-    icon: "building-2",
-  },
+  "/funil": { render: renderPipeline, label: "Funil", icon: "kanban" },
+  "/funil/configurar": { render: renderPipelineConfig, roles: ["admin", "gestor"], nav: "/funil" },
+  "/leads": { render: renderLeads, label: "Leads", icon: "building-2" },
   "/agentes": {
     render: (c) => renderComingSoon(c, "Agentes SDR", "Persona, base de conhecimento, premissas e cadências de cada agente.", 3),
     label: "Agentes SDR",
@@ -117,7 +113,7 @@ async function render() {
     return;
   }
 
-  root.innerHTML = shellHtml(user, path);
+  root.innerHTML = shellHtml(user, route?.nav || path);
   const view = document.getElementById("view");
 
   if (!route) renderNotFound(view);

@@ -6,7 +6,15 @@ const { loadSessionUser, requireRole } = require("../lib/auth");
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
-const routeDefs = [...require("../lib/routes/auth"), ...require("../lib/routes/users")];
+const routeDefs = [
+  ...require("../lib/routes/auth"),
+  ...require("../lib/routes/users"),
+  ...require("../lib/routes/pipelines").routes,
+  ...require("../lib/routes/deals"),
+  ...require("../lib/routes/companies"),
+  ...require("../lib/routes/import"),
+  ...require("../lib/routes/dashboard"),
+];
 
 // "/users/:id" -> /^\/users\/(?<id>uuid)$/  (parâmetros são sempre UUID)
 const routes = routeDefs.map((r) => ({
@@ -16,12 +24,13 @@ const routes = routeDefs.map((r) => ({
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-function apiPath(req) {
+function parseUrl(req) {
   const url = new URL(req.url, "http://localhost");
   // A rewrite da Vercel envia o caminho original em ?__path=; no dev server vem no próprio pathname.
   const fromQuery = url.searchParams.get("__path");
+  url.searchParams.delete("__path");
   const raw = fromQuery !== null ? `/${fromQuery}` : url.pathname.replace(/^\/api/, "");
-  return raw.replace(/\/+$/, "") || "/";
+  return { path: raw.replace(/\/+$/, "") || "/", query: url.searchParams };
 }
 
 function matchRoute(method, path) {
@@ -37,7 +46,7 @@ function matchRoute(method, path) {
 
 module.exports = async (req, res) => {
   try {
-    const path = apiPath(req);
+    const { path, query } = parseUrl(req);
     const { route, params, pathMatched } = matchRoute(req.method, path);
     if (!route) throw new HttpError(pathMatched ? 405 : 404, pathMatched ? "method_not_allowed" : "not_found");
 
@@ -56,7 +65,7 @@ module.exports = async (req, res) => {
     }
 
     const body = MUTATING.has(req.method) ? await readJsonBody(req) : {};
-    const result = await route.handler({ req, res, user, params, body, ip: clientIp(req) });
+    const result = await route.handler({ req, res, user, params, query, body, ip: clientIp(req) });
 
     if (result && result.status) sendJson(res, result.status, result.body);
     else sendJson(res, 200, result);
