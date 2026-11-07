@@ -78,9 +78,9 @@ Tela **Captação** (`/captacao`), envio direto ao funil (com etapa e agente), o
   follow-ups automáticos), **autônomo** (todos automáticos). Respostas de leads nunca são automáticas:
   a cadência para e um humano assume. Também para em opt-out, sem e-mail ou card qualificado/desqualificado.
 - Envio só em horário comercial (seg-sex 8h-18h de Brasília) por padrão; respeita o limite diário do agente.
-- Processamento: botão "Processar cadências" em Aprovações,  ( para rodar
-  continuamente) ou  com  (4 passos por chamada).
-- **Resultados** (): funil de conversão, cards por etapa, desempenho por agente, atividade diária.
+- Processamento: botão "Processar cadências" em Aprovações, `npm run cadence` (`npm run cadence -- --watch`
+  para rodar continuamente) ou `GET /api/cron/cadence` com `CRON_SECRET` (4 passos por chamada).
+- **Resultados** (`/resultados`): funil de conversão, cards por etapa, desempenho por agente, atividade diária.
 
 ## Migrações
 
