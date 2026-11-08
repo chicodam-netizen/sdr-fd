@@ -456,3 +456,30 @@ code { font-family: Consolas, monospace; font-size: 0.85em; background: #0a1830;
 .vbar-x { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
 .table-view { margin-top: 30px; }
 .table-view summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+
+/* Leads: faixa de filtros compacta no topo */
+.page-head-compact { margin-bottom: 10px; align-items: center; }
+.page-head-compact h1 { font-size: 1.4rem; display: flex; align-items: baseline; gap: 10px; }
+.page-head-compact h1 .small { font-weight: 400; }
+.content:has(.filterbar) { max-width: none; }
+.filterbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; padding: 6px 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.filterbar input, .filterbar select { height: 32px; padding: 4px 8px; font-size: 0.85rem; border-radius: 6px; }
+.filterbar select { width: auto; max-width: 112px; text-overflow: ellipsis; flex: 0 1 auto; }
+.filterbar select[name=list] { max-width: 136px; }
+.filterbar select[name=size], .filterbar select[name=contact], .filterbar select[name=inPipeline] { max-width: 100px; }
+.filterbar .search { flex: 1 1 170px; min-width: 120px; max-width: 260px; }
+.filterbar .search input { padding-left: 30px; }
+.filterbar .search [data-lucide] { left: 9px; width: 15px; height: 15px; }
+.filterbar .is-set, .filterbar .fb-range.is-set input { border-color: var(--accent); color: var(--accent); }
+.fb-range { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 0.82rem; padding-left: 2px; }
+.fb-range input { width: 46px; padding: 4px 6px; }
+.fb-sep { flex: 1 1 0; }
+.results-head { margin: 0 0 8px; }
+@media (max-width: 860px) {
+  .filterbar select, .filterbar .search { max-width: none; flex: 1 1 140px; }
+  .fb-sep { display: none; }
+}
+@media (min-width: 1100px) { .filterbar { flex-wrap: nowrap; } }

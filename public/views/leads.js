@@ -70,20 +70,23 @@ function filtersHtml() {
   const f = state.filters;
   const cityOpts = state.facets.cities.map((c) => ({ value: c.city, label: `${escapeHtml(c.city)} (${c.n.toLocaleString("pt-BR")})` }));
   const listOpts = state.facets.lists.map((l) => ({ value: l.list, label: `${escapeHtml(l.list)} (${l.n.toLocaleString("pt-BR")})` }));
+  const sel = (name, label, opts, value) =>
+    `<select name="${name}" aria-label="${label}" title="${label}" class="${value ? "is-set" : ""}">${options(opts, value || "", { empty: label })}</select>`;
+  const active = ["q", "list", "city", "size", "minEmployees", "maxEmployees", "contact", "discovered", "inPipeline"].some((k) => f[k]);
+  // Faixa única e compacta: aplica sozinha (selects ao mudar, texto/números enquanto digita).
   return `
-    <form id="lead-filters" class="panel form lead-filters" novalidate>
-      <div class="search grow"><i data-lucide="search"></i><input name="q" type="search" placeholder="Nome, CNPJ ou atividade" value="${escapeHtml(f.q || "")}" /></div>
-      <select name="list" aria-label="Lista">${options(listOpts, f.list || "", { empty: "Todas as listas" })}</select>
-      <select name="city" aria-label="Cidade">${options(cityOpts, f.city || "", { empty: "Todas as cidades" })}</select>
-      <select name="size" aria-label="Porte">${options([{ value: "micro", label: "Microempresa" }, { value: "pequeno", label: "Pequeno porte" }, { value: "demais", label: "Médio/grande" }], f.size || "", { empty: "Todos os portes" })}</select>
-      <label class="inline-num">Func. de <input name="minEmployees" type="number" min="0" value="${escapeHtml(f.minEmployees || "")}" /></label>
-      <label class="inline-num">até <input name="maxEmployees" type="number" min="0" value="${escapeHtml(f.maxEmployees || "")}" /></label>
-      <select name="contact" aria-label="Contato">${options([{ value: "with", label: "Com e-mail de contato" }, { value: "without", label: "Sem e-mail de contato" }], f.contact || "", { empty: "Contato: todos" })}</select>
-      <select name="discovered" aria-label="Pesquisa web">${options([{ value: "yes", label: "Já pesquisadas na web" }, { value: "no", label: "Não pesquisadas" }], f.discovered || "", { empty: "Pesquisa web: todas" })}</select>
-      <select name="inPipeline" aria-label="Funil">${options([{ value: "no", label: "Fora do funil" }, { value: "yes", label: "No funil" }], f.inPipeline || "", { empty: "Funil: todas" })}</select>
-      <select name="order" aria-label="Ordem">${options([{ value: "priority", label: "Ordem: prioridade" }, { value: "employees", label: "Ordem: nº func." }, { value: "name", label: "Ordem: nome" }, { value: "recent", label: "Ordem: mais recentes" }], f.order || "priority")}</select>
-      <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
-      <button type="button" class="btn btn-secondary btn-sm" id="clear-filters">Limpar</button>
+    <form id="lead-filters" class="filterbar" novalidate role="search">
+      <div class="search"><i data-lucide="search"></i><input name="q" type="search" placeholder="Buscar empresa, CNPJ..." title="Nome, CNPJ ou atividade" value="${escapeHtml(f.q || "")}" aria-label="Buscar" /></div>
+      ${sel("list", "Lista", listOpts, f.list)}
+      ${sel("city", "Cidade", cityOpts, f.city)}
+      ${sel("size", "Porte", [{ value: "micro", label: "Microempresa" }, { value: "pequeno", label: "Pequeno porte" }, { value: "demais", label: "Médio/grande" }], f.size)}
+      <span class="fb-range${f.minEmployees || f.maxEmployees ? " is-set" : ""}" title="Número de funcionários">Func.
+        <input name="minEmployees" type="number" min="0" placeholder="de" value="${escapeHtml(f.minEmployees || "")}" aria-label="Funcionários de" />
+        <input name="maxEmployees" type="number" min="0" placeholder="até" value="${escapeHtml(f.maxEmployees || "")}" aria-label="Funcionários até" /></span>
+      ${sel("contact", "Contato", [{ value: "with", label: "Com e-mail" }, { value: "without", label: "Sem e-mail" }], f.contact)}
+      ${sel("discovered", "Pesquisa web", [{ value: "yes", label: "Pesquisadas" }, { value: "no", label: "Não pesquisadas" }], f.discovered)}
+      ${sel("inPipeline", "Funil", [{ value: "no", label: "Fora do funil" }, { value: "yes", label: "No funil" }], f.inPipeline)}
+      ${active ? `<button type="button" class="link-btn" id="clear-filters">Limpar</button>` : ""}
     </form>`;
 }
 
@@ -97,8 +100,9 @@ function tableHtml() {
   const pages = Math.ceil(r.total / r.pageSize);
   const sel = state.selected;
   return `
-    <div class="results-head"><span><strong>${r.total.toLocaleString("pt-BR")}</strong> empresa(s) · página ${r.page} de ${pages}</span>
+    <div class="results-head"><span class="muted small">Página ${r.page} de ${pages.toLocaleString("pt-BR")} · ${r.pageSize} por página</span>
       <span class="pager">
+        <select id="order-select" class="select-sm" aria-label="Ordenar por" title="Ordenar por">${options([{ value: "priority", label: "Ordem: prioridade" }, { value: "employees", label: "Ordem: nº func." }, { value: "name", label: "Ordem: nome" }, { value: "recent", label: "Ordem: mais recentes" }], state.filters.order || "priority")}</select>
         <button class="btn btn-secondary btn-sm" data-page="${r.page - 1}" ${r.page <= 1 ? "disabled" : ""}>Anterior</button>
         <button class="btn btn-secondary btn-sm" data-page="${r.page + 1}" ${r.page >= pages ? "disabled" : ""}>Próxima</button>
       </span></div>
@@ -144,6 +148,11 @@ function drawTable() {
     bar.querySelector("strong").textContent = sel.size;
   };
   box.querySelectorAll("[data-page]").forEach((b) => b.addEventListener("click", () => load(Number(b.dataset.page))));
+  box.querySelector("#order-select")?.addEventListener("change", (e) => {
+    state.filters.order = e.target.value;
+    prefs.set("leadFilters", JSON.stringify(state.filters));
+    load(1);
+  });
   box.querySelectorAll("tbody tr").forEach((tr) =>
     tr.addEventListener("click", (e) => {
       if (e.target.closest("input")) return;
@@ -211,6 +220,8 @@ async function load(page = 1) {
   const { ok, data } = await api("GET", `/leadbase?${qs}`);
   if (!ok) toast(errorMessage(data), "error");
   state.result = ok ? data : { companies: [], total: 0, page: 1, pageSize: 50 };
+  const totalEl = state.container.querySelector("#leads-total");
+  if (totalEl) totalEl.textContent = `${state.result.total.toLocaleString("pt-BR")} empresa(s)`;
   drawTable();
 }
 
@@ -395,30 +406,59 @@ export async function renderLeads(container, { query, user }) {
   if (f.ok) state.facets = f.data;
 
   container.innerHTML = `
-    <div class="page-head page-head-row">
-      <div><h1>Leads</h1><p class="muted">Base de empresas. Filtre, pesquise contatos na web e envie ao funil quando estiver pronta para abordagem.</p></div>
-      <a class="btn btn-secondary" href="#/captacao"><i data-lucide="radar"></i>Captar mais leads</a>
+    <div class="page-head page-head-row page-head-compact">
+      <h1>Leads <span class="muted small" id="leads-total"></span></h1>
+      <a class="btn btn-secondary btn-sm" href="#/captacao"><i data-lucide="radar"></i>Captar mais leads</a>
     </div>
-    ${filtersHtml()}
+    <div id="filters-slot">${filtersHtml()}</div>
     <div id="companies"><p class="muted">Carregando...</p></div>`;
   refreshIcons();
-
-  const form = container.querySelector("#lead-filters");
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    state.filters = Object.fromEntries([...new FormData(form).entries()].filter(([, v]) => v !== ""));
-    prefs.set("leadFilters", JSON.stringify(state.filters));
-    state.selected.clear();
-    load(1);
-  });
-  form.querySelectorAll("select").forEach((s) => s.addEventListener("change", () => form.requestSubmit()));
-  container.querySelector("#clear-filters").addEventListener("click", () => {
-    state.filters = { order: "priority" };
-    prefs.set("leadFilters", "{}");
-    renderLeads(container, { query: new URLSearchParams(), user });
-  });
+  bindFilters();
 
   await load(1);
   const open = query.get("empresa");
   if (open) openCompany(open);
+}
+
+// Aplica os filtros e redesenha a faixa (destaque dos filtros ativos e botão Limpar).
+function applyFilters() {
+  const form = state.container.querySelector("#lead-filters");
+  state.filters = { ...Object.fromEntries([...new FormData(form).entries()].filter(([, v]) => v !== "")), order: state.filters.order || "priority" };
+  prefs.set("leadFilters", JSON.stringify(state.filters));
+  state.selected.clear();
+  const focused = document.activeElement?.name;
+  state.container.querySelector("#filters-slot").innerHTML = filtersHtml();
+  refreshIcons();
+  bindFilters();
+  // Mantém o cursor no campo em que a pessoa estava digitando.
+  if (focused) {
+    const el = state.container.querySelector(`#lead-filters [name="${focused}"]`);
+    if (el && el.tagName === "INPUT") {
+      el.focus();
+      el.setSelectionRange?.(el.value.length, el.value.length);
+    }
+  }
+  load(1);
+}
+
+function bindFilters() {
+  const form = state.container.querySelector("#lead-filters");
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    applyFilters();
+  });
+  form.querySelectorAll("select").forEach((s) => s.addEventListener("change", applyFilters));
+  let timer;
+  form.querySelectorAll("input").forEach((i) =>
+    i.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(applyFilters, 450);
+    })
+  );
+  form.querySelector("#clear-filters")?.addEventListener("click", () => {
+    form.reset();
+    form.querySelectorAll("input").forEach((i) => (i.value = ""));
+    form.querySelectorAll("select").forEach((s) => (s.value = ""));
+    applyFilters();
+  });
 }
