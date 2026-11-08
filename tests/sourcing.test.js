@@ -122,6 +122,16 @@ test("carga filtra por UF, CNAE e situação ativa e completa com dados da empre
   await assert.rejects(loadCnpj(getPool(), dir, {}, () => {}), /filtro/);
 });
 
+test("carga com filtro de porte grava só as empresas do porte pedido, já completas", async () => {
+  await getPool().query(`DELETE FROM cnpj_establishments WHERE cnpj LIKE '9900000%'`);
+  const r = await loadCnpj(getPool(), dir, { ufs: ["MG"], portes: ["pequeno", "demais"] }, () => {});
+  assert.equal(r.kept, 1); // C1 (demais); C4 é micro; C2 baixada; C3 é SP
+  const { rows } = await getPool().query(`SELECT cnpj, razao_social, porte FROM cnpj_establishments WHERE cnpj LIKE '9900000%'`);
+  assert.deepEqual(rows.map((x) => x.cnpj), [C1]);
+  assert.equal(rows[0].razao_social, "LATICINIOS SERRA TESTE LTDA");
+  assert.equal(rows[0].porte, "demais");
+});
+
 test("busca na base: filtros, CNAE por texto, municípios e exigência de filtro", async () => {
   assert.equal((await sdr("GET", "/sourcing/cnpj")).data.error, "missing_filters");
   const r = await sdr("GET", "/sourcing/cnpj?uf=MG&cnae=99001&hasEmail=1&porte=demais");
