@@ -166,6 +166,14 @@ test("envio da base CNPJ ao funil: cria empresa, contato geral e card; não dupl
   assert.equal((await sdr("GET", "/sourcing/cnpj?uf=MG&cnae=99001")).data.results[0].inBase, true);
 });
 
+test("segmento a partir do CNAE: nome da divisão ou \"CNAE XX\" quando desconhecida", async () => {
+  await getPool().query(`INSERT INTO cnae_divisions (code, name) VALUES ('99', 'Segmento de Teste') ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name`);
+  const { sectorFromCnae } = require("../lib/sector");
+  assert.equal(await sectorFromCnae(getPool(), "9900101"), "Segmento de Teste");
+  assert.equal(await sectorFromCnae(getPool(), "1234567"), "CNAE 12");
+  await getPool().query(`DELETE FROM cnae_divisions WHERE code = '99'`);
+});
+
 test("enriquecimento: base local primeiro, BrasilAPI depois, só preenche vazios e descarta sócios", async () => {
   let calls = 0;
   enrich.setFetch(async (url) => {

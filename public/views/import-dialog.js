@@ -7,7 +7,8 @@ import { readCsvFile, normalizeHeader } from "../csv.js";
 const FIELDS = [
   { key: "company.name", label: "Empresa *", aliases: ["empresa", "razaosocial", "nomefantasia", "company", "nomedaempresa", "nome"] },
   { key: "company.cnpj", label: "CNPJ", aliases: ["cnpj"] },
-  { key: "company.segment", label: "Segmento", aliases: ["segmento", "setor", "ramo", "atividade", "cnae", "industry"] },
+  { key: "company.sector", label: "Segmento", aliases: ["segmento", "setor", "divisao", "divisaocnae"] },
+  { key: "company.segment", label: "Atividade (CNAE)", aliases: ["atividade", "ramo", "cnae", "industry", "atividadeprincipal"] },
   { key: "company.city", label: "Cidade", aliases: ["cidade", "municipio", "city"] },
   { key: "company.uf", label: "UF", aliases: ["uf", "estado", "state"] },
   { key: "company.website", label: "Site", aliases: ["site", "website", "url", "dominio"] },

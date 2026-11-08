@@ -217,7 +217,7 @@ function openNewDeal() {
       <h3 class="span-2 form-section">Empresa</h3>
       <label class="span-2">Nome da empresa *<input name="companyName" required autofocus /></label>
       <label>CNPJ<input name="cnpj" placeholder="00.000.000/0000-00" /></label>
-      <label>Segmento<input name="segment" /></label>
+      <label>Atividade<input name="segment" placeholder="ex.: Fabricação de laticínios" /></label>
       <label>Cidade<input name="city" /></label>
       <label>UF<input name="uf" maxlength="2" /></label>
       <label class="span-2">Site<input name="website" placeholder="empresa.com.br" /></label>

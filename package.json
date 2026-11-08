@@ -7,7 +7,7 @@
     "dev": "node --env-file=.env.local scripts/dev-server.js",
     "migrate": "node --env-file=.env.local scripts/migrate.js",
     "seed": "node --env-file=.env.local scripts/seed.js",
-    "test": "node --env-file=.env.local --test \"tests/*.test.js\"",
+    "test": "node --env-file=.env.local --import ./tests/setup-env.js --test \"tests/*.test.js\"",
     "inbox": "node --env-file=.env.local scripts/inbox.js",
     "discover": "node --env-file=.env.local scripts/discover.js",
     "import-rmbh": "node --env-file=.env.local scripts/import-planilha-rmbh.js",

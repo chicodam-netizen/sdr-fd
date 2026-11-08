@@ -70,21 +70,23 @@ function filtersHtml() {
   const f = state.filters;
   const cityOpts = state.facets.cities.map((c) => ({ value: c.city, label: `${escapeHtml(c.city)} (${c.n.toLocaleString("pt-BR")})` }));
   const listOpts = state.facets.lists.map((l) => ({ value: l.list, label: `${escapeHtml(l.list)} (${l.n.toLocaleString("pt-BR")})` }));
+  const sectorOpts = (state.facets.sectors || []).map((s) => ({ value: s.sector, label: `${escapeHtml(s.sector)} (${s.n.toLocaleString("pt-BR")})` }));
   const sel = (name, label, opts, value) =>
     `<select name="${name}" aria-label="${label}" title="${label}" class="${value ? "is-set" : ""}">${options(opts, value || "", { empty: label })}</select>`;
-  const active = ["q", "list", "city", "size", "minEmployees", "maxEmployees", "contact", "discovered", "inPipeline"].some((k) => f[k]);
+  const active = ["q", "sector", "list", "city", "size", "minEmployees", "maxEmployees", "contact", "discovered", "inPipeline"].some((k) => f[k]);
   // Faixa única e compacta: aplica sozinha (selects ao mudar, texto/números enquanto digita).
   return `
     <form id="lead-filters" class="filterbar" novalidate role="search">
-      <div class="search"><i data-lucide="search"></i><input name="q" type="search" placeholder="Buscar empresa, CNPJ..." title="Nome, CNPJ ou atividade" value="${escapeHtml(f.q || "")}" aria-label="Buscar" /></div>
+      <div class="search"><i data-lucide="search"></i><input name="q" type="search" placeholder="Buscar…" title="Nome, CNPJ ou atividade" value="${escapeHtml(f.q || "")}" aria-label="Buscar" /></div>
+      ${sel("sector", "Segmento", sectorOpts, f.sector)}
       ${sel("list", "Lista", listOpts, f.list)}
       ${sel("city", "Cidade", cityOpts, f.city)}
       ${sel("size", "Porte", [{ value: "micro", label: "Microempresa" }, { value: "pequeno", label: "Pequeno porte" }, { value: "demais", label: "Médio/grande" }], f.size)}
       <span class="fb-range${f.minEmployees || f.maxEmployees ? " is-set" : ""}" title="Número de funcionários">Func.
         <input name="minEmployees" type="number" min="0" placeholder="de" value="${escapeHtml(f.minEmployees || "")}" aria-label="Funcionários de" />
         <input name="maxEmployees" type="number" min="0" placeholder="até" value="${escapeHtml(f.maxEmployees || "")}" aria-label="Funcionários até" /></span>
-      ${sel("contact", "Contato", [{ value: "with", label: "Com e-mail" }, { value: "without", label: "Sem e-mail" }], f.contact)}
-      ${sel("discovered", "Pesquisa web", [{ value: "yes", label: "Pesquisadas" }, { value: "no", label: "Não pesquisadas" }], f.discovered)}
+      ${sel("contact", "E-mail", [{ value: "with", label: "Com e-mail" }, { value: "without", label: "Sem e-mail" }], f.contact)}
+      ${sel("discovered", "Pesquisa", [{ value: "yes", label: "Pesquisadas" }, { value: "no", label: "Não pesquisadas" }], f.discovered)}
       ${sel("inPipeline", "Funil", [{ value: "no", label: "Fora do funil" }, { value: "yes", label: "No funil" }], f.inPipeline)}
       ${active ? `<button type="button" class="link-btn" id="clear-filters">Limpar</button>` : ""}
     </form>`;
@@ -107,7 +109,7 @@ function tableHtml() {
         <button class="btn btn-secondary btn-sm" data-page="${r.page + 1}" ${r.page >= pages ? "disabled" : ""}>Próxima</button>
       </span></div>
     <div class="panel panel-flush"><table class="table table-click">
-      <thead><tr>${isManager() ? `<th><input type="checkbox" id="sel-page" aria-label="Selecionar página" /></th>` : ""}<th>Empresa</th><th>Cidade</th><th>Atividade</th><th>Func.</th><th>Contatos</th><th>Pesquisa web</th><th>Funil</th></tr></thead>
+      <thead><tr>${isManager() ? `<th><input type="checkbox" id="sel-page" aria-label="Selecionar página" /></th>` : ""}<th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Func.</th><th>Contatos</th><th>Pesquisa web</th><th>Funil</th></tr></thead>
       <tbody>${r.companies
         .map(
           (c) => `<tr data-id="${c.id}">
@@ -115,7 +117,7 @@ function tableHtml() {
             <td data-label="Empresa"><strong>${escapeHtml(c.name)}</strong>${c.registrationStatus && c.registrationStatus !== "ativa" ? ` <span class="badge badge-danger">${escapeHtml(c.registrationStatus)}</span>` : ""}
               <div class="muted small">${escapeHtml(formatCnpj(c.cnpj))}${c.lists?.includes("Lista de trabalho RMBH") ? ` · <span class="badge">lista de trabalho</span>` : ""}</div></td>
             <td data-label="Cidade">${escapeHtml(c.city || "—")}</td>
-            <td data-label="Atividade" class="small">${escapeHtml(c.segment || "—")}</td>
+            <td data-label="Segmento" class="small">${c.sector ? `<strong>${escapeHtml(c.sector)}</strong>` : "—"}${c.segment && c.segment !== c.sector ? `<div class="muted">${escapeHtml(c.segment)}</div>` : ""}</td>
             <td data-label="Func.">${c.employees ?? "—"}</td>
             <td data-label="Contatos">${c.emails ? `<span class="badge badge-success">${c.emails} e-mail${c.emails > 1 ? "s" : ""}</span>` : c.contacts ? `${c.contacts}` : `<span class="muted">—</span>`}</td>
             <td data-label="Pesquisa web">${c.discoveredAt ? (c.confidence ? `<span class="badge ${CONF_BADGE[c.confidence] || ""}">${escapeHtml(c.confidence)}</span>` : `<span class="muted small">cadastral</span>`) : `<span class="muted">—</span>`}</td>
@@ -265,7 +267,7 @@ async function openCompany(id) {
     const { company: c, contacts, deals } = data;
     dialog.innerHTML = `
       <header class="drawer-head">
-        <div><h2>${escapeHtml(c.name)}</h2><p class="muted">${escapeHtml([c.city, c.employees ? `${c.employees} funcionários` : null].filter(Boolean).join(" · "))} · origem: ${escapeHtml(sourceLabel(c))}</p></div>
+        <div><h2>${escapeHtml(c.name)}</h2><p class="muted">${escapeHtml([c.sector, c.city, c.employees ? `${c.employees} funcionários` : null].filter(Boolean).join(" · "))} · origem: ${escapeHtml(sourceLabel(c))}</p></div>
         <button class="icon-btn" data-close aria-label="Fechar"><i data-lucide="x"></i></button>
       </header>
       <div class="drawer-body">
@@ -311,7 +313,9 @@ async function openCompany(id) {
           <form id="company-form" class="form form-grid" novalidate>
             <label class="span-2">Nome *<input name="name" value="${escapeHtml(c.name)}" required /></label>
             <label>CNPJ<input name="cnpj" value="${escapeHtml(formatCnpj(c.cnpj))}" /></label>
-            <label>Segmento<input name="segment" value="${escapeHtml(c.segment || "")}" /></label>
+            <label>Segmento<input name="sector" list="sector-options" value="${escapeHtml(c.sector || "")}" placeholder="ex.: Metalurgia" /></label>
+            <datalist id="sector-options">${(state.facets.sectors || []).map((s) => `<option value="${escapeHtml(s.sector)}"></option>`).join("")}</datalist>
+            <label class="span-2">Atividade (CNAE)<input name="segment" value="${escapeHtml(c.segment || "")}" /></label>
             <label>Cidade<input name="city" value="${escapeHtml(c.city || "")}" /></label>
             <label>UF<input name="uf" maxlength="2" value="${escapeHtml(c.uf || "")}" /></label>
             <label>Site<input name="website" value="${escapeHtml(c.website || "")}" /></label>
@@ -341,7 +345,7 @@ async function openCompany(id) {
     });
 
     bindForm(dialog.querySelector("#company-form"), async (fd) => {
-      const payload = Object.fromEntries(["name", "cnpj", "segment", "city", "uf", "website", "phone", "linkedinUrl", "notes"].map((k) => [k, fd.get(k)]));
+      const payload = Object.fromEntries(["name", "cnpj", "sector", "segment", "city", "uf", "website", "phone", "linkedinUrl", "notes"].map((k) => [k, fd.get(k)]));
       const r = await api("PATCH", `/companies/${id}`, payload);
       if (!r.ok) return errorMessage(r.data);
       toast("Empresa salva.", "success");

@@ -5,6 +5,7 @@
 // Uso: node --env-file=.env.local scripts/import-planilha-rmbh.js --file "mercado RMBH.xlsx" [--dry-run]
 const ExcelJS = require("exceljs");
 const { getPool } = require("../lib/db");
+const { parseDivision } = require("../lib/sector");
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -78,9 +79,10 @@ async function main() {
     if (!key) throw new Error(`Coluna "${name}" não encontrada na aba 28-12-24`);
     return h[key];
   };
-  const C = { cnpj: col("CNPJ"), name: col("Cliente"), city: col("Cidade"), porte: col("Porte"), cnae: col("Cnae"), func: col("Nº F"), pri: col("PRI") };
+  const C = { division: col("Divis"), cnpj: col("CNPJ"), name: col("Cliente"), city: col("Cidade"), porte: col("Porte"), cnae: col("Cnae"), func: col("Nº F"), pri: col("PRI") };
 
   const rows = [];
+  const divisions = new Map();
   const skipped = { porte: 0, cnpj: 0 };
   base.eachRow((row, n) => {
     if (n === 1) return;
@@ -97,12 +99,15 @@ async function main() {
       return;
     }
     const cnae = splitCode(text(row.getCell(C.cnae)));
+    const div = parseDivision(text(row.getCell(C.division)));
+    if (div) divisions.set(div.code, div.name);
     const lists = [LIST_BASE, ...(workSet.has(cnpj) ? [LIST_WORK] : [])];
     rows.push({
       cnpj,
       name: name.slice(0, 200),
       city: text(row.getCell(C.city)) || null,
       segment: cnae.desc ? cnae.desc.slice(0, 120) : null,
+      sector: div ? div.name : null,
       cnaeCode: cnae.code,
       size: PORTE_SIZE[porteNum],
       employees: num(text(row.getCell(C.func))),
@@ -134,25 +139,31 @@ async function main() {
   if (!orgs.length) throw new Error(`Organização "${ORG}" não encontrada.`);
   const orgId = orgs[0].id;
 
+  for (const [code, name] of divisions) {
+    await pool.query(`INSERT INTO cnae_divisions (code, name) VALUES ($1, $2) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name`, [code, name]);
+  }
+  console.log(`Segmentos (divisões CNAE): ${divisions.size}`);
+
   let inserted = 0;
   let updated = 0;
-  const COLS = 12;
+  const COLS = 13;
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);
     const params = [];
     const values = chunk.map((r, j) => {
-      params.push(orgId, r.name, r.cnpj, r.city, "MG", r.segment, r.cnaeCode, r.size, r.employees, r.priority, r.lists, SOURCE_DETAIL);
+      params.push(orgId, r.name, r.cnpj, r.city, "MG", r.segment, r.cnaeCode, r.size, r.employees, r.priority, r.lists, SOURCE_DETAIL, r.sector);
       const b = j * COLS;
-      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7}, $${b + 8}, $${b + 9}, $${b + 10}, $${b + 11}::text[], 'planilha', $${b + 12})`;
+      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7}, $${b + 8}, $${b + 9}, $${b + 10}, $${b + 11}::text[], 'planilha', $${b + 12}, $${b + 13})`;
     });
     const res = await pool.query(
-      `INSERT INTO companies (organization_id, name, cnpj, city, uf, segment, cnae_code, size, employees, priority, lists, source, source_detail)
+      `INSERT INTO companies (organization_id, name, cnpj, city, uf, segment, cnae_code, size, employees, priority, lists, source, source_detail, sector)
        VALUES ${values.join(",")}
        ON CONFLICT (organization_id, cnpj) WHERE cnpj IS NOT NULL DO UPDATE SET
          employees = coalesce(EXCLUDED.employees, companies.employees),
          priority = coalesce(EXCLUDED.priority, companies.priority),
          cnae_code = coalesce(companies.cnae_code, EXCLUDED.cnae_code),
          size = coalesce(companies.size, EXCLUDED.size),
+         sector = coalesce(EXCLUDED.sector, companies.sector),
          lists = (SELECT array_agg(DISTINCT x) FROM unnest(companies.lists || EXCLUDED.lists) AS x),
          updated_at = now()
        RETURNING (xmax = 0) AS inserted`,

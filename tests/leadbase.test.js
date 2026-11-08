@@ -98,6 +98,21 @@ test("filtros da base: lista, cidade, funcionários, ordem por prioridade e face
   assert.ok(f.lists.some((l) => l.list === "Lista de trabalho RMBH" && l.n === 2));
 });
 
+test("segmento: filtro, facetas e edição pela ficha preservam o valor", async () => {
+  await getPool().query(`UPDATE companies SET sector = 'Metalurgia' WHERE id = ANY($1)`, [[ids[0], ids[2]]]);
+  await getPool().query(`UPDATE companies SET sector = 'Fabricação de Produtos Alimentícios' WHERE id = $1`, [ids[1]]);
+  const r = (await sdr("GET", `/leadbase?sector=${encodeURIComponent("Metalurgia")}`)).data;
+  assert.equal(r.total, 2);
+  assert.ok(r.companies.every((c) => c.sector === "Metalurgia"));
+  const f = (await sdr("GET", "/leadbase/facets")).data;
+  assert.deepEqual(f.sectors.map((s) => [s.sector, s.n]), [["Fabricação de Produtos Alimentícios", 1], ["Metalurgia", 2]]);
+  // a ficha envia o segmento junto; trocar só o nome mantém o segmento
+  const co = (await gestor("GET", `/companies/${ids[1]}`)).data.company;
+  assert.equal(co.sector, "Fabricação de Produtos Alimentícios");
+  await gestor("PATCH", `/companies/${ids[1]}`, { name: co.name, sector: co.sector, city: co.city, uf: co.uf });
+  assert.equal((await gestor("GET", `/companies/${ids[1]}`)).data.company.sector, "Fabricação de Produtos Alimentícios");
+});
+
 test("busca de contatos: retoma pause_turn, grava canais e decisores com fonte e calcula custo", async () => {
   const calls = fakeClaude({
     website: "https://metalurgicaum-teste.com.br",
