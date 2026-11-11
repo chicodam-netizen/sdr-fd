@@ -92,6 +92,45 @@ function filtersHtml() {
     </form>`;
 }
 
+// ---------- Ordenação ----------
+// [chave, rótulo da coluna, direção padrão no 1º clique]
+const SORT_COLUMNS = [["name", "Empresa", "asc"], ["city", "Cidade", "asc"], ["sector", "Segmento", "asc"], ["employees", "Func.", "desc"], ["contacts", "Contatos", "desc"], ["discovered", "Pesquisa web", "desc"], ["pipeline", "Funil", "desc"]];
+const SORT_DEFAULT_DIR = { recent: "desc", priority: "desc", ...Object.fromEntries(SORT_COLUMNS.map(([k, , d]) => [k, d])) };
+const SORT_LABEL = { priority: "prioridade", recent: "mais recentes", ...Object.fromEntries(SORT_COLUMNS.map(([k, l]) => [k, l.toLowerCase()])) };
+
+function currentOrder() {
+  const [key, d] = String(state.filters.order || "priority").split("_");
+  const k = SORT_DEFAULT_DIR[key] ? key : "priority";
+  const dir = d === "asc" || d === "desc" ? d : SORT_DEFAULT_DIR[k];
+  return { key: k, dir, value: `${k}_${dir}` };
+}
+
+function orderOptions() {
+  const arrow = (dir) => (dir === "asc" ? "↑" : "↓");
+  const list = [
+    ["priority_desc", "Ordem: prioridade"], ["recent_desc", "Ordem: mais recentes"], ["name_asc", "Ordem: nome (A-Z)"], ["name_desc", "Ordem: nome (Z-A)"],
+    ["employees_desc", "Ordem: mais func."], ["employees_asc", "Ordem: menos func."], ["city_asc", "Ordem: cidade"], ["sector_asc", "Ordem: segmento"],
+    ["contacts_desc", "Ordem: com e-mail primeiro"], ["discovered_desc", "Ordem: pesquisadas primeiro"], ["pipeline_desc", "Ordem: no funil primeiro"],
+  ];
+  const cur = currentOrder();
+  if (!list.some(([v]) => v === cur.value)) list.push([cur.value, `Ordem: ${SORT_LABEL[cur.key]} ${arrow(cur.dir)}`]);
+  return list.map(([value, label]) => ({ value, label }));
+}
+
+function sortTh(key, label) {
+  const cur = currentOrder();
+  const active = cur.key === key;
+  const icon = active ? (cur.dir === "asc" ? "arrow-up" : "arrow-down") : "arrow-up-down";
+  const aria = active ? (cur.dir === "asc" ? "ascending" : "descending") : "none";
+  return `<th aria-sort="${aria}"><button type="button" class="th-sort${active ? " active" : ""}" data-sort="${key}" title="Ordenar por ${escapeHtml(label.toLowerCase())}">${escapeHtml(label)}<i data-lucide="${icon}"></i></button></th>`;
+}
+
+function setOrder(value) {
+  state.filters.order = value;
+  prefs.set("leadFilters", JSON.stringify(state.filters));
+  load(1);
+}
+
 function tableHtml() {
   const r = state.result;
   if (!r) return `<p class="muted">Carregando...</p>`;
@@ -104,12 +143,12 @@ function tableHtml() {
   return `
     <div class="results-head"><span class="muted small">Página ${r.page} de ${pages.toLocaleString("pt-BR")} · ${r.pageSize} por página</span>
       <span class="pager">
-        <select id="order-select" class="select-sm" aria-label="Ordenar por" title="Ordenar por">${options([{ value: "priority", label: "Ordem: prioridade" }, { value: "employees", label: "Ordem: nº func." }, { value: "name", label: "Ordem: nome" }, { value: "recent", label: "Ordem: mais recentes" }], state.filters.order || "priority")}</select>
+        <select id="order-select" class="select-sm" aria-label="Ordenar por" title="Ordenar por">${options(orderOptions(), currentOrder().value)}</select>
         <button class="btn btn-secondary btn-sm" data-page="${r.page - 1}" ${r.page <= 1 ? "disabled" : ""}>Anterior</button>
         <button class="btn btn-secondary btn-sm" data-page="${r.page + 1}" ${r.page >= pages ? "disabled" : ""}>Próxima</button>
       </span></div>
     <div class="panel panel-flush"><table class="table table-click">
-      <thead><tr>${isManager() ? `<th><input type="checkbox" id="sel-page" aria-label="Selecionar página" /></th>` : ""}<th>Empresa</th><th>Cidade</th><th>Segmento</th><th>Func.</th><th>Contatos</th><th>Pesquisa web</th><th>Funil</th></tr></thead>
+      <thead><tr>${isManager() ? `<th><input type="checkbox" id="sel-page" aria-label="Selecionar página" /></th>` : ""}${SORT_COLUMNS.map(([key, label]) => sortTh(key, label)).join("")}</tr></thead>
       <tbody>${r.companies
         .map(
           (c) => `<tr data-id="${c.id}">
@@ -150,11 +189,16 @@ function drawTable() {
     bar.querySelector("strong").textContent = sel.size;
   };
   box.querySelectorAll("[data-page]").forEach((b) => b.addEventListener("click", () => load(Number(b.dataset.page))));
-  box.querySelector("#order-select")?.addEventListener("change", (e) => {
-    state.filters.order = e.target.value;
-    prefs.set("leadFilters", JSON.stringify(state.filters));
-    load(1);
-  });
+  box.querySelector("#order-select")?.addEventListener("change", (e) => setOrder(e.target.value));
+  // Cabeçalho: 1º clique usa a direção padrão da coluna; clicar de novo inverte.
+  box.querySelectorAll("[data-sort]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const key = b.dataset.sort;
+      const cur = currentOrder();
+      const dir = cur.key === key ? (cur.dir === "asc" ? "desc" : "asc") : SORT_DEFAULT_DIR[key];
+      setOrder(`${key}_${dir}`);
+    })
+  );
   box.querySelectorAll("tbody tr").forEach((tr) =>
     tr.addEventListener("click", (e) => {
       if (e.target.closest("input")) return;

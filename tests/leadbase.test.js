@@ -113,6 +113,21 @@ test("segmento: filtro, facetas e edição pela ficha preservam o valor", async 
   assert.equal((await gestor("GET", `/companies/${ids[1]}`)).data.company.sector, "Fabricação de Produtos Alimentícios");
 });
 
+test("ordenação por coluna: crescente, decrescente e valor inválido", async () => {
+  const names = async (o) => (await sdr("GET", `/leadbase?order=${o}`)).data.companies.map((c) => c.name);
+  const asc = await names("name_asc");
+  assert.deepEqual(asc, [...asc].sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" })));
+  assert.deepEqual(await names("name_desc"), [...asc].reverse());
+  const emp = async (o) => (await sdr("GET", `/leadbase?order=${o}`)).data.companies.map((c) => c.employees).filter((n) => n !== null);
+  const up = await emp("employees_asc");
+  assert.deepEqual(up, [...up].sort((a, b) => a - b));
+  const down = await emp("employees");
+  assert.deepEqual(down, [...down].sort((a, b) => b - a));
+  for (const o of ["city_desc", "sector_asc", "contacts_desc", "discovered_asc", "pipeline_desc", "x;drop", "name_sideways"]) {
+    assert.equal((await sdr("GET", `/leadbase?order=${encodeURIComponent(o)}`)).status, 200, o);
+  }
+});
+
 test("novo lead manual: cria empresa, contato e lista; duplicado devolve a ficha existente", async () => {
   const r = await sdr("POST", "/companies", {
     name: "Serralheria Manual Ltda", sector: "Metalurgia", city: "Sabará", uf: "mg", list: "Indicações",
