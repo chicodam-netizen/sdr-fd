@@ -113,6 +113,40 @@ test("segmento: filtro, facetas e edição pela ficha preservam o valor", async 
   assert.equal((await gestor("GET", `/companies/${ids[1]}`)).data.company.sector, "Fabricação de Produtos Alimentícios");
 });
 
+test("novo lead manual: cria empresa, contato e lista; duplicado devolve a ficha existente", async () => {
+  const r = await sdr("POST", "/companies", {
+    name: "Serralheria Manual Ltda", sector: "Metalurgia", city: "Sabará", uf: "mg", list: "Indicações",
+    contact: { name: "Joana Prado", jobTitle: "Diretora", email: "joana@serralheria-manual.com.br" },
+  });
+  assert.equal(r.status, 201);
+  const c = (await sdr("GET", `/companies/${r.data.id}`)).data;
+  assert.equal(c.company.source, "manual");
+  assert.equal(c.company.sector, "Metalurgia");
+  assert.equal(c.company.uf, "MG");
+  assert.deepEqual(c.company.lists, ["Indicações"]);
+  assert.equal(c.contacts.length, 1);
+  assert.equal(c.contacts[0].email, "joana@serralheria-manual.com.br");
+  // aparece na base, filtrável pela lista nova
+  const l = (await sdr("GET", `/leadbase?list=${encodeURIComponent("Indicações")}`)).data;
+  assert.deepEqual(l.companies.map((x) => x.name), ["Serralheria Manual Ltda"]);
+  // mesmo nome: 409 com o id da existente
+  const dup = await sdr("POST", "/companies", { name: "serralheria manual ltda" });
+  assert.equal(dup.status, 409);
+  assert.equal(dup.data.error, "company_name_in_use");
+  assert.equal(dup.data.companyId, r.data.id);
+  // e-mail de contato já usado
+  const dupMail = await sdr("POST", "/companies", { name: "Outra Empresa", contact: { email: "JOANA@serralheria-manual.com.br" } });
+  assert.equal(dupMail.status, 409);
+  assert.equal(dupMail.data.error, "contact_email_in_use");
+  // sem nome
+  assert.equal((await sdr("POST", "/companies", { name: " " })).data.error, "missing_company_name");
+  // sem contato: só a empresa
+  const only = await sdr("POST", "/companies", { name: "Empresa Sem Contato" });
+  assert.equal(only.status, 201);
+  assert.equal((await sdr("GET", `/companies/${only.data.id}`)).data.contacts.length, 0);
+  await getPool().query(`DELETE FROM companies WHERE id = ANY($1)`, [[r.data.id, only.data.id]]);
+});
+
 test("busca de contatos: retoma pause_turn, grava canais e decisores com fonte e calcula custo", async () => {
   const calls = fakeClaude({
     website: "https://metalurgicaum-teste.com.br",

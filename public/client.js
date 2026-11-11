@@ -44,6 +44,8 @@ const ERRORS = {
   invalid_owner: "Responsável inválido.",
   invalid_stage_id: "Etapa inválida.",
   cnpj_in_use: "Já existe uma empresa com esse CNPJ.",
+  company_name_in_use: "Já existe uma empresa com esse nome.",
+  contact_email_in_use: "Já existe um contato com esse e-mail.",
   missing_contact_name: "Informe o nome ou e-mail do contato.",
   stage_not_empty: "Esta etapa tem cards. Mova-os antes de excluir.",
   last_stage: "O funil precisa de pelo menos uma etapa.",

@@ -397,6 +397,80 @@ async function openCompany(id) {
   await render();
 }
 
+// ---------- Novo lead (cadastro manual) ----------
+function openNewLead() {
+  const listNames = state.facets.lists.map((l) => l.list);
+  const dialog = openDialog(`
+    <h2>Novo lead</h2>
+    <p class="muted">Cadastro manual na base de leads. Depois você pode buscar contatos na web ou enviar ao funil.</p>
+    <form id="new-lead-form" class="form form-grid" novalidate>
+      <h3 class="form-section span-2">Empresa</h3>
+      <label class="span-2">Nome *<input name="name" required autofocus /></label>
+      <label>CNPJ<input name="cnpj" placeholder="00.000.000/0000-00" /></label>
+      <label>Segmento<input name="sector" list="new-sector-options" placeholder="ex.: Metalurgia" /></label>
+      <datalist id="new-sector-options">${(state.facets.sectors || []).map((s) => `<option value="${escapeHtml(s.sector)}"></option>`).join("")}</datalist>
+      <label class="span-2">Atividade<input name="segment" placeholder="ex.: Fabricação de esquadrias de metal" /></label>
+      <label>Cidade<input name="city" /></label>
+      <label>UF<input name="uf" maxlength="2" /></label>
+      <label>Site<input name="website" placeholder="https://" /></label>
+      <label>Telefone<input name="phone" /></label>
+      <label class="span-2">LinkedIn da empresa<input name="linkedinUrl" /></label>
+      <label class="span-2">Lista<input name="list" list="new-list-options" placeholder="opcional — ex.: Indicações" /></label>
+      <datalist id="new-list-options">${listNames.map((l) => `<option value="${escapeHtml(l)}"></option>`).join("")}</datalist>
+      <label class="span-2">Observações<textarea name="notes" rows="2"></textarea></label>
+      <h3 class="form-section span-2">Contato (opcional)</h3>
+      <label>Nome<input name="ct_name" /></label>
+      <label>Cargo<input name="ct_jobTitle" /></label>
+      <label>E-mail<input type="email" name="ct_email" /></label>
+      <label>Telefone<input name="ct_phone" /></label>
+      <label class="span-2">LinkedIn<input name="ct_linkedinUrl" /></label>
+      <label class="check span-2"><input type="checkbox" name="enrich" checked /> Se tiver CNPJ, consultar os dados cadastrais (Receita) ao salvar</label>
+      <p class="form-error span-2" hidden></p>
+      <div class="span-2 dialog-actions">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i>Cadastrar lead</button>
+      </div>
+    </form>`);
+  refreshIcons();
+  dialog.querySelector("[data-close]").addEventListener("click", () => dialog.close());
+  const form = dialog.querySelector("#new-lead-form");
+  bindForm(form, async (fd) => {
+    const g = (k) => fd.get(k);
+    const payload = {
+      ...Object.fromEntries(["name", "cnpj", "sector", "segment", "city", "uf", "website", "phone", "linkedinUrl", "notes", "list"].map((k) => [k, g(k)])),
+      contact: { name: g("ct_name"), jobTitle: g("ct_jobTitle"), email: g("ct_email"), phone: g("ct_phone"), linkedinUrl: g("ct_linkedinUrl") },
+    };
+    const r = await api("POST", "/companies", payload);
+    if (!r.ok) {
+      if (r.data?.companyId) {
+        // Empresa já existe: oferece abrir a ficha dela.
+        const box = form.querySelector(".form-error");
+        box.innerHTML = `${escapeHtml(errorMessage(r.data))} <a href="#" id="open-existing">Abrir ficha de ${escapeHtml(r.data.companyName)}</a>`;
+        box.hidden = false;
+        box.querySelector("#open-existing").addEventListener("click", (e) => {
+          e.preventDefault();
+          dialog.close();
+          openCompany(r.data.companyId);
+        });
+        return "";
+      }
+      return errorMessage(r.data);
+    }
+    const id = r.data.id;
+    if (payload.cnpj && g("enrich") === "on") {
+      const e = await api("POST", `/companies/${id}/enrich`, {});
+      if (!e.ok) toast(`Lead cadastrado, mas a consulta do CNPJ falhou: ${errorMessage(e.data)}`, "error");
+    }
+    toast("Lead cadastrado.", "success");
+    dialog.close();
+    const f = await api("GET", "/leadbase/facets");
+    if (f.ok) state.facets = f.data;
+    load(1);
+    openCompany(id);
+    return null;
+  });
+}
+
 // ---------- Página ----------
 export async function renderLeads(container, { query, user }) {
   let saved = {};
@@ -412,12 +486,16 @@ export async function renderLeads(container, { query, user }) {
   container.innerHTML = `
     <div class="page-head page-head-row page-head-compact">
       <h1>Leads <span class="muted small" id="leads-total"></span></h1>
-      <a class="btn btn-secondary btn-sm" href="#/captacao"><i data-lucide="radar"></i>Captar mais leads</a>
+      <div class="head-actions">
+        <a class="btn btn-secondary btn-sm" href="#/captacao"><i data-lucide="radar"></i>Captar mais leads</a>
+        <button type="button" class="btn btn-primary btn-sm" id="new-lead"><i data-lucide="plus"></i>Novo lead</button>
+      </div>
     </div>
     <div id="filters-slot">${filtersHtml()}</div>
     <div id="companies"><p class="muted">Carregando...</p></div>`;
   refreshIcons();
   bindFilters();
+  container.querySelector("#new-lead").addEventListener("click", openNewLead);
 
   await load(1);
   const open = query.get("empresa");
