@@ -3,3 +3,8 @@
 process.env.MAIL_ENABLED = "false";
 process.env.MAIL_REDIRECT_TO = process.env.MAIL_REDIRECT_TO || "teste-redirect@teste.local";
 process.env.AI_FAKE = "1";
+// Nunca lê a caixa de e-mail real nem liga a automação durante os testes.
+delete process.env.IMAP_HOST;
+delete process.env.IMAP_USER;
+delete process.env.IMAP_PASS;
+process.env.AUTOMATION_ENABLED = "false";

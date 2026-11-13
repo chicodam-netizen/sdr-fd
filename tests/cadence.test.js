@@ -164,6 +164,42 @@ test("autônomo: envia já no 1º passo; resposta do lead para a cadência e des
   assert.equal((await run()).data.processed, 0);
 });
 
+test("resposta do lead: rascunho de resposta automático com a mensagem do lead; ausência não para a cadência", async () => {
+  const a = await newAgent("Resposta", "draft");
+  const d = await newDeal("Empresa Resposta", a.id);
+  await sdr("POST", `/deals/${d.id}/enroll`, {});
+  await run();
+  const first = (await gestor("GET", "/messages/pending")).data.messages.find((m) => m.dealId === d.id);
+  await sdr("POST", `/messages/${first.id}/send`, {});
+  // ausência: cadência segue ativa e não gera resposta
+  const ooo = await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Estou de férias até dia 20." });
+  assert.equal(ooo.data.classification.category, "out_of_office");
+  assert.equal(ooo.data.replyDraftId, null);
+  assert.equal((await enrollmentOf(d.id)).status, "active");
+  // resposta real: cadência para e a IA deixa um rascunho de resposta em Aprovações
+  const r = await sdr("POST", `/deals/${d.id}/messages/inbound`, { subject: "Re: ideia", body: "Podemos agendar uma reunião na quinta?" });
+  assert.ok(r.data.replyDraftId);
+  assert.equal((await enrollmentOf(d.id)).status, "replied");
+  const pend = (await gestor("GET", "/messages/pending")).data.messages.filter((m) => m.dealId === d.id);
+  assert.equal(pend.length, 1);
+  assert.equal(pend[0].ai.kind, "reply");
+  assert.match(pend[0].subject, /^Re: /);
+  assert.equal(pend[0].lastInbound.category, "meeting_request");
+  assert.match(pend[0].lastInbound.body, /reunião na quinta/);
+  // nova resposta substitui o rascunho anterior (um pendente por card)
+  await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Pode ser às 10h?" });
+  assert.equal((await gestor("GET", "/messages/pending")).data.messages.filter((m) => m.dealId === d.id).length, 1);
+  // pedido de saída: sem rascunho
+  const out = await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Por favor, me remover da lista." });
+  assert.equal(out.data.replyDraftId, null);
+  assert.equal((await gestor("GET", "/messages/pending")).data.messages.filter((m) => m.dealId === d.id).length, 0);
+  // status da automação (desligada nos testes, sem IMAP)
+  const auto = await gestor("GET", "/automation");
+  assert.equal(auto.data.enabled, false);
+  assert.equal(auto.data.imap, false);
+  assert.equal((await sdr("GET", "/automation")).status, 403);
+});
+
 test("mover para Qualificado encerra; pausar/retomar/encerrar; bloqueios de inscrição", async () => {
   const a = await newAgent("Paradas", "draft");
   const d = await newDeal("Empresa Paradas", a.id);

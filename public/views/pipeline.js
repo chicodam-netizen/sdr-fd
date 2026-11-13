@@ -72,20 +72,72 @@ function listHtml(deals) {
   const stageOpts = (d) => options(state.pipeline.stages.map((s) => ({ value: s.id, label: escapeHtml(s.name) })), d.stageId);
 
   if (!sorted.length) return `<div class="panel empty-state"><p class="muted">Nenhum card encontrado.</p></div>`;
+  const sel = state.selected;
+  const canManage = isManager();
+  const allOn = sorted.every((d) => sel.has(d.id));
   return `<div class="panel panel-flush"><table class="table table-click">
-    <thead><tr>${th("company", "Empresa")}<th>Contato</th>${th("stage", "Etapa")}${th("owner", "Responsável")}${th("value", "Valor")}${th("days", "Na etapa")}</tr></thead>
+    <thead><tr>${canManage ? `<th class="col-check"><input type="checkbox" id="sel-all" aria-label="Selecionar todos" ${allOn ? "checked" : ""} /></th>` : ""}${th("company", "Empresa")}<th>Contato</th>${th("stage", "Etapa")}<th>Cadência</th>${th("owner", "Responsável")}${th("value", "Valor")}${th("days", "Na etapa")}</tr></thead>
     <tbody>${sorted
       .map(
         (d) => `<tr data-id="${d.id}">
+          ${canManage ? `<td class="col-check"><input type="checkbox" class="row-check" data-id="${d.id}" aria-label="Selecionar ${escapeHtml(d.company.name)}" ${sel.has(d.id) ? "checked" : ""} /></td>` : ""}
           <td data-label="Empresa"><strong>${escapeHtml(d.company.name)}</strong>${d.company.city ? `<div class="muted small">${escapeHtml([d.company.city, d.company.uf].filter(Boolean).join("/"))}</div>` : ""}</td>
           <td data-label="Contato">${d.contact ? `${escapeHtml(d.contact.name)}${d.contact.email && d.contact.email !== d.contact.name ? `<div class="muted small">${escapeHtml(d.contact.email)}</div>` : ""}` : "—"}</td>
           <td data-label="Etapa"><select class="select-sm stage-select" data-id="${d.id}">${stageOpts(d)}</select></td>
+          <td data-label="Cadência">${d.cadenceStatus ? `<span class="badge">${CADENCE_LABELS[d.cadenceStatus]}</span>` : `<span class="muted">—</span>`}</td>
           <td data-label="Responsável">${escapeHtml(d.owner?.name || "—")}</td>
           <td data-label="Valor">${formatMoney(d.value) || "—"}</td>
           <td data-label="Na etapa">${daysSince(d.stageChangedAt)} dias</td>
         </tr>`
       )
-      .join("")}</tbody></table></div>`;
+      .join("")}</tbody></table></div>
+    ${canManage ? `<div class="selection-bar" id="sel-bar" ${sel.size ? "" : "hidden"}>
+      <span><strong>${sel.size}</strong> card(s) selecionado(s) <button type="button" class="link-btn" id="sel-clear">limpar</button></span>
+      <span class="toolbar-actions"><button class="btn btn-primary btn-sm" id="sel-enroll"><i data-lucide="repeat"></i>Iniciar cadência</button></span>
+    </div>` : ""}`;
+}
+
+const CADENCE_LABELS = { active: "Em cadência", waiting_approval: "Aguardando aprovação", paused: "Pausada" };
+const SKIP_LABELS = {
+  already_enrolled: "já estavam em cadência", contact_without_email: "sem e-mail de contato", contact_opted_out: "pediram para sair",
+  deal_closed: "card qualificado/desqualificado", missing_agent: "sem agente definido", agent_inactive: "agente inativo",
+  invalid_agent: "agente inválido", cadence_empty: "agente sem passos de cadência", not_found: "não encontrados",
+};
+const isManager = () => ["admin", "gestor"].includes(state.user.role);
+
+// Inscrição em lote dos cards selecionados na cadência de um agente.
+async function openBulkEnroll() {
+  const ids = [...state.selected];
+  const chosen = state.deals.filter((d) => state.selected.has(d.id));
+  const noEmail = chosen.filter((d) => !d.contact?.email).length;
+  const enrolled = chosen.filter((d) => d.cadenceStatus).length;
+  const ag = await api("GET", "/agents");
+  const agents = ag.ok ? ag.data.agents.filter((a) => a.active) : [];
+  const dialog = openDialog(`
+    <form class="form" novalidate>
+      <h2>Iniciar cadência em ${ids.length} card(s)</h2>
+      <label>Agente
+        <select name="agentId">${options([{ value: "", label: "Agente já definido em cada card" }, ...agents.map((a) => ({ value: a.id, label: escapeHtml(a.name) }))], agents.length === 1 ? agents[0].id : "")}</select>
+      </label>
+      <p class="muted small">Cada card recebe a sequência de passos do agente escolhido, começando pelo 1º passo. Com o agente em modo Rascunho, todo e-mail vai para Aprovações antes de sair.</p>
+      ${noEmail || enrolled ? `<div class="notice notice-warning">Serão pulados: ${[noEmail ? `${noEmail} sem e-mail de contato` : "", enrolled ? `${enrolled} já em cadência` : ""].filter(Boolean).join(" e ")}.</div>` : ""}
+      <p class="form-error" hidden></p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary"><i data-lucide="play"></i>Iniciar</button>
+      </div>
+    </form>`);
+  refreshIcons();
+  bindForm(dialog.querySelector("form"), async (fd) => {
+    const r = await api("POST", "/enrollments/bulk", { dealIds: ids, agentId: fd.get("agentId") || undefined });
+    if (!r.ok) return errorMessage(r.data);
+    const skipped = Object.entries(r.data.skipped || {}).map(([k, n]) => `${n} ${SKIP_LABELS[k] || k}`);
+    toast(`Cadência iniciada em ${r.data.enrolled} card(s).${skipped.length ? ` Pulados: ${skipped.join(", ")}.` : ""}`, r.data.enrolled ? "success" : "error");
+    dialog.close();
+    state.selected.clear();
+    await loadDeals();
+    drawBoard();
+  });
 }
 
 function toolbarHtml() {
@@ -191,6 +243,30 @@ function bindKanban(board) {
 }
 
 function bindList(board) {
+  const updateBar = () => {
+    const bar = board.querySelector("#sel-bar");
+    if (!bar) return;
+    bar.hidden = !state.selected.size;
+    bar.querySelector("strong").textContent = state.selected.size;
+  };
+  board.querySelectorAll(".row-check").forEach((cb) => {
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.selected.add(cb.dataset.id);
+      else state.selected.delete(cb.dataset.id);
+      updateBar();
+    });
+  });
+  board.querySelectorAll(".col-check").forEach((td) => td.addEventListener("click", (e) => e.stopPropagation()));
+  board.querySelector("#sel-all")?.addEventListener("change", (e) => {
+    visibleDeals().forEach((d) => (e.target.checked ? state.selected.add(d.id) : state.selected.delete(d.id)));
+    drawBoard();
+  });
+  board.querySelector("#sel-clear")?.addEventListener("click", () => {
+    state.selected.clear();
+    drawBoard();
+  });
+  board.querySelector("#sel-enroll")?.addEventListener("click", openBulkEnroll);
   board.querySelectorAll("[data-sort]").forEach((b) =>
     b.addEventListener("click", () => {
       const k = b.dataset.sort;
@@ -326,6 +402,7 @@ export async function renderPipeline(container, { user }) {
     search: "",
     owner: "",
     sort: { key: "updated", dir: 1 },
+    selected: new Set(),
   };
   await loadDeals();
   container.innerHTML = toolbarHtml();

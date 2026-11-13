@@ -3,6 +3,43 @@ import { api, errorMessage, escapeHtml, formatDateTime, refreshIcons, toast } fr
 import { openDeal } from "./deal-dialog.js";
 
 const KIND_LABELS = { first: "Primeiro contato", followup: "Follow-up", reply: "Resposta" };
+const CATEGORY_LABELS = {
+  interested: "Interessado", meeting_request: "Pediu reunião", question: "Pergunta", objection: "Objeção", not_now: "Agora não",
+  not_interested: "Sem interesse", unsubscribe: "Pediu para sair", out_of_office: "Ausência", wrong_person: "Pessoa errada", other: "Outro",
+};
+
+// Rascunho de resposta: mostra o que o lead escreveu (e como a IA classificou) para revisar com contexto.
+function inboundHtml(m) {
+  const i = m.lastInbound;
+  if (m.ai?.kind !== "reply" || !i) return "";
+  return `<details class="lead-reply" open>
+    <summary><i data-lucide="mail-open"></i>Mensagem do lead${i.category ? ` · <span class="badge">${escapeHtml(CATEGORY_LABELS[i.category] || i.category)}</span>` : ""}${i.at ? ` · <span class="muted small">${formatDateTime(i.at)}</span>` : ""}</summary>
+    ${i.summary ? `<p class="muted small">Resumo da IA: ${escapeHtml(i.summary)}</p>` : ""}
+    ${i.subject ? `<div class="small"><strong>${escapeHtml(i.subject)}</strong></div>` : ""}
+    <pre class="lead-reply-body">${escapeHtml(i.body || "")}</pre>
+  </details>`;
+}
+
+function automationHtml(a) {
+  if (!a) return "";
+  const when = (iso) => (iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
+  const ib = a.lastInbox;
+  const cd = a.lastCadence;
+  const last = a.lastRunAt
+    ? `Última verificação ${when(a.lastRunAt)}: ${ib?.ok ? `${ib.matched} resposta(s) de leads, ${ib.drafted} rascunho(s) de resposta` : ib?.error === "imap_not_configured" ? "caixa de entrada não configurada" : "erro ao ler a caixa"}; cadência: ${cd ? `${cd.drafted} rascunho(s), ${cd.sent} enviado(s)` : "—"}.`
+    : "Ainda não rodou desde que o servidor subiu.";
+  return a.enabled
+    ? `<div class="notice automation-status"><i data-lucide="bot"></i><span><strong>Automação ligada</strong> · lê a caixa de entrada e processa as cadências a cada ${a.intervalMin} min${a.running ? " · <em>rodando agora…</em>" : ` · próxima às ${when(a.nextRunAt)}`}<br><span class="muted small">${last}</span></span></div>`
+    : `<div class="notice automation-status"><i data-lucide="bot-off"></i><span><strong>Automação desligada</strong> · use os botões ao lado para ler a caixa e processar as cadências manualmente.</span></div>`;
+}
+
+async function loadAutomation() {
+  const box = state.container.querySelector("#automation");
+  if (!box) return;
+  const r = await api("GET", "/automation");
+  box.innerHTML = r.ok ? automationHtml(r.data) : "";
+  refreshIcons();
+}
 let state;
 
 function itemHtml(m) {
@@ -16,6 +53,7 @@ function itemHtml(m) {
       </div>
       <button class="btn btn-secondary btn-sm" data-act="open"><i data-lucide="panel-right-open"></i>Abrir card</button>
     </header>
+    ${inboundHtml(m)}
     ${m.ai?.rationale ? `<p class="msg-rationale"><i data-lucide="sparkles"></i>${escapeHtml(m.ai.rationale)}</p>` : ""}
     ${blocked ? `<div class="notice notice-danger">Envio bloqueado: contato ${blocked}.</div>` : ""}
     <label class="msg-field">Assunto<input class="draft-subject" value="${escapeHtml(m.subject || "")}" maxlength="200" /></label>
@@ -89,6 +127,7 @@ export async function renderApprovals(container, { user }) {
         <p class="muted">Mensagens escritas pelos agentes aguardando revisão. Edite à vontade antes de aprovar.</p></div>
       ${["admin", "gestor"].includes(user.role) ? `<span class="toolbar-actions"><button class="btn btn-secondary" id="run-cadences" title="Gera os passos de cadência que já venceram"><i data-lucide="repeat"></i>Processar cadências</button><button class="btn btn-secondary" id="poll-inbox"><i data-lucide="mail-search"></i>Ler caixa de entrada</button></span>` : ""}
     </div>
+    ${["admin", "gestor"].includes(user.role) ? `<div id="automation"></div>` : ""}
     <div id="approvals"><p class="muted">Carregando...</p></div>`;
   refreshIcons();
   container.querySelector("#run-cadences")?.addEventListener("click", async (e) => {
@@ -117,11 +156,13 @@ export async function renderApprovals(container, { user }) {
     const r = await api("POST", "/inbox/poll", {});
     btn.disabled = false;
     if (!r.ok) return toast(errorMessage(r.data), "error");
-    toast(`Caixa lida: ${r.data.fetched} e-mail(s) novo(s), ${r.data.matched} associado(s) a cards.`, "success");
+    toast(`Caixa lida: ${r.data.scanned} e-mail(s) dos últimos dias, ${r.data.matched} resposta(s) nova(s) de leads, ${r.data.drafted} rascunho(s) de resposta.`, "success");
     load();
+    loadAutomation();
   });
   const [p, o] = await Promise.all([api("GET", "/pipelines"), api("GET", "/users/options")]);
   state.pipelines = p.ok ? p.data.pipelines : [];
   state.owners = o.ok ? o.data.users : [];
   await load();
+  await loadAutomation();
 }

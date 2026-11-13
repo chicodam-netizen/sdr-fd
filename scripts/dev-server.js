@@ -4,6 +4,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const apiHandler = require("../api/index");
+const { startAutomation } = require("../lib/automation");
 
 const PORT = Number(process.env.PORT) || 3100;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -45,6 +46,7 @@ function createServer() {
 if (require.main === module) {
   createServer().listen(PORT, () => {
     console.log(`SDR FD rodando em http://localhost:${PORT}`);
+    if (startAutomation()) console.log("Automação ligada: caixa de entrada + cadências a cada", process.env.AUTOMATION_INTERVAL_MIN || 10, "min");
   });
 }
 
