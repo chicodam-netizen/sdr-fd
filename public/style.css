@@ -506,3 +506,13 @@ code { font-family: Consolas, monospace; font-size: 0.85em; background: #0a1830;
 .badge-suggest-disqualified { background: rgba(239, 91, 91, 0.12); color: #ffb3b3; border-color: rgba(239, 91, 91, 0.5); }
 .suggest-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .suggest-row svg { width: 13px; height: 13px; vertical-align: -2px; }
+.li-profile { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.li-profile .li-url { flex: 1 1 260px; min-width: 0; }
+.li-count { text-align: right; margin-top: -4px; }
+.li-count.li-over { color: var(--danger); font-weight: 600; }
+.li-help { margin-bottom: 14px; }
+.li-help summary { cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.li-help summary svg { width: 16px; height: 16px; }
+.li-help ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.li-task .badge svg { width: 12px; height: 12px; vertical-align: -1px; margin-right: 3px; }
+.channel-li { background: rgba(10, 102, 194, 0.18); color: #9cc9ff; border-color: rgba(10, 102, 194, 0.6); }

@@ -109,6 +109,12 @@ function openKnowledgeEditor(item, { agentId, scope, readOnly, onSaved }) {
   });
 }
 
+const STEP_CHANNELS = [
+  { value: "email", label: "E-mail" },
+  { value: "linkedin_connect", label: "LinkedIn: pedido de conexão" },
+  { value: "linkedin_message", label: "LinkedIn: mensagem" },
+];
+
 // Editor dos passos da cadência do agente (salva a lista inteira).
 async function renderCadenceEditor(box, agentId, canEdit) {
   const r = await api("GET", `/agents/${agentId}/cadence`);
@@ -119,6 +125,7 @@ async function renderCadenceEditor(box, agentId, canEdit) {
         .map(
           (s, i) => `<li data-i="${i}">
             <div class="cadence-step-head"><strong>Passo ${i + 1}</strong>
+              <select class="select-sm step-channel" ${canEdit ? "" : "disabled"}>${STEP_CHANNELS.map((c) => `<option value="${c.value}"${(s.channel || "email") === c.value ? " selected" : ""}>${c.label}</option>`).join("")}</select>
               <label class="inline-num">${i === 0 ? "após a inscrição, em" : "dias depois:"} <input type="number" min="0" max="90" class="step-delay" value="${s.delayDays}" ${canEdit ? "" : "disabled"} /> ${i === 0 ? "dias" : ""}</label>
               ${canEdit && steps.length > 1 ? `<button class="icon-btn step-remove" title="Remover passo"><i data-lucide="trash-2"></i></button>` : ""}</div>
             <textarea class="step-instruction" rows="2" placeholder="Orientação para a IA neste passo" ${canEdit ? "" : "disabled"}>${escapeHtml(s.instruction || "")}</textarea>
@@ -132,6 +139,7 @@ async function renderCadenceEditor(box, agentId, canEdit) {
       [...box.querySelectorAll(".cadence-steps li")].map((li) => ({
         delayDays: Number(li.querySelector(".step-delay").value),
         instruction: li.querySelector(".step-instruction").value,
+        channel: li.querySelector(".step-channel").value,
       }));
     box.querySelectorAll(".step-remove").forEach((b) =>
       b.addEventListener("click", () => {
@@ -141,7 +149,7 @@ async function renderCadenceEditor(box, agentId, canEdit) {
       })
     );
     box.querySelector("#step-add")?.addEventListener("click", () => {
-      steps = [...read(), { delayDays: 3, instruction: "" }];
+      steps = [...read(), { delayDays: 3, instruction: "", channel: "email" }];
       draw();
     });
     box.querySelector("#steps-save")?.addEventListener("click", async () => {
@@ -217,7 +225,7 @@ export async function renderAgentEdit(container, { user, query }) {
         <div id="kb">${knowledgeHtml(knowledge, agent?.id, canEdit)}</div>
         ${!agent && canEdit ? `<p class="hint mt">Salve o agente para adicionar documentos exclusivos dele.</p>` : ""}
         ${agent ? `<h2 class="mt">Cadência de follow-up</h2>
-          <p class="muted small">Passos enviados aos cards inscritos. "Dias" conta a partir do envio do passo anterior (o 1º, da inscrição). A cadência para quando o lead responde, pede para sair ou o card é qualificado/desqualificado.</p>
+          <p class="muted small">Passos de LinkedIn viram tarefas na tela LinkedIn: a IA escreve o texto e você envia pelo LinkedIn e marca como feito (nunca são enviados automaticamente). Passos enviados aos cards inscritos. "Dias" conta a partir do envio do passo anterior (o 1º, da inscrição). A cadência para quando o lead responde, pede para sair ou o card é qualificado/desqualificado.</p>
           <div id="cadence"><p class="muted small">Carregando...</p></div>` : ""}
       </div>
     </div>`;

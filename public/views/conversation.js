@@ -14,7 +14,27 @@ export const CATEGORY_LABELS = {
   wrong_person: "Pessoa errada",
   other: "Outro",
 };
-const KIND_LABELS = { first: "Primeiro contato", followup: "Follow-up", reply: "Resposta" };
+const KIND_LABELS = {
+  first: "Primeiro contato", followup: "Follow-up", reply: "Resposta",
+  linkedin_connect: "LinkedIn · pedido de conexão", linkedin_message: "LinkedIn · mensagem", linkedin_reply: "LinkedIn · resposta",
+};
+const LI_BADGE = `<span class="badge channel-li">LinkedIn</span>`;
+
+// Tarefa de LinkedIn no card: o texto é enviado por uma pessoa no LinkedIn; aqui só copia e marca como feito.
+function linkedinDraftHtml(m) {
+  return `<div class="msg msg-draft msg-draft-li" data-id="${m.id}">
+    <div class="msg-head"><span class="badge badge-warning">Tarefa · ${KIND_LABELS[m.ai?.kind] || "LinkedIn"}${m.step ? ` · passo ${m.step} da cadência` : ""}</span>
+      <span class="muted small">${escapeHtml(m.agentName || "")} · ${formatDateTime(m.createdAt)}</span></div>
+    ${m.ai?.rationale ? `<p class="msg-rationale"><i data-lucide="sparkles"></i>${escapeHtml(m.ai.rationale)}</p>` : ""}
+    <label class="msg-field">Texto para o LinkedIn<textarea class="draft-body" rows="5">${escapeHtml(m.body)}</textarea></label>
+    <p class="hint">Envie pelo LinkedIn e marque como feito. A lista completa do dia está em <a href="#/linkedin">LinkedIn</a>.</p>
+    <div class="msg-actions">
+      ${m.step ? `<button class="btn btn-ghost-danger btn-sm" data-li="skip"><i data-lucide="skip-forward"></i>Pular</button>` : `<button class="btn btn-ghost-danger btn-sm" data-li="discard"><i data-lucide="x"></i>Descartar</button>`}
+      <button class="btn btn-secondary btn-sm" data-li="copy"><i data-lucide="copy"></i>Copiar texto</button>
+      <button class="btn btn-primary btn-sm" data-li="done"><i data-lucide="check"></i>Feito: enviei no LinkedIn</button>
+    </div>
+  </div>`;
+}
 const ENROLL_STATUS = {
   active: "Em andamento",
   waiting_approval: "Aguardando aprovação do rascunho",
@@ -71,6 +91,12 @@ function draftHtml(m) {
 }
 
 function sentHtml(m) {
+  if (m.channel === "linkedin") {
+    return `<div class="msg msg-out">
+      <div class="msg-head">${LI_BADGE}<span class="badge badge-success">Enviado por você</span><span class="muted small">${KIND_LABELS[m.ai?.kind] || ""} · ${formatDateTime(m.sentAt || m.createdAt)}${m.approvedByName ? ` · ${escapeHtml(m.approvedByName)}` : ""}</span></div>
+      <div class="msg-body">${escapeHtml(m.body)}</div>
+    </div>`;
+  }
   const status =
     m.status === "failed"
       ? `<span class="badge badge-danger">Falhou</span>`
@@ -89,7 +115,7 @@ function receivedHtml(m, pipeline) {
   const c = m.ai?.classification;
   const targetStage = c && ["qualified", "disqualified"].includes(c.suggested_stage_kind) ? pipeline?.stages.find((s) => s.kind === c.suggested_stage_kind) : null;
   return `<div class="msg msg-in">
-    <div class="msg-head"><span class="badge">Resposta recebida</span><span class="muted small">${escapeHtml(m.fromEmail || "")} · ${formatDateTime(m.sentAt || m.createdAt)}</span></div>
+    <div class="msg-head">${m.channel === "linkedin" ? LI_BADGE : ""}<span class="badge">Resposta recebida</span><span class="muted small">${escapeHtml(m.fromEmail || "")} · ${formatDateTime(m.sentAt || m.createdAt)}</span></div>
     ${m.subject ? `<div class="msg-subject">${escapeHtml(m.subject)}</div>` : ""}
     <div class="msg-body">${escapeHtml(m.body)}</div>
     ${
@@ -130,17 +156,19 @@ export async function renderConversation(container, opts) {
       </div>
       <details class="conv-instruction"${hasDraft || optOut ? "" : " open"}>
         <summary>Gerar mensagem com IA</summary>
-        <textarea id="conv-instruction" rows="2" placeholder="Orientação opcional para este e-mail (ex.: citar o evento X, foco em LGPD, tom mais curto)"></textarea>
+        <select id="conv-channel" class="select-sm"><option value="email">E-mail</option><option value="linkedin_connect">LinkedIn: pedido de conexão</option><option value="linkedin_message">LinkedIn: mensagem</option></select>
+        <textarea id="conv-instruction" rows="2" placeholder="Orientação opcional para esta mensagem (ex.: citar o evento X, foco em ISO 9001, tom mais curto)"></textarea>
         <button class="btn btn-primary btn-sm" id="conv-generate" ${optOut ? "disabled" : ""}><i data-lucide="sparkles"></i>Gerar rascunho</button>
       </details>
       <div class="conv-thread">${
         messages.length
-          ? messages.map((m) => (m.status === "draft" ? draftHtml(m) : m.direction === "in" ? receivedHtml(m, opts.pipeline) : sentHtml(m))).join("")
+          ? messages.map((m) => (m.status === "draft" ? (m.channel === "linkedin" ? linkedinDraftHtml(m) : draftHtml(m)) : m.direction === "in" ? receivedHtml(m, opts.pipeline) : sentHtml(m))).join("")
           : `<p class="muted small">Nenhuma mensagem ainda.</p>`
       }</div>
       <details class="conv-inbound">
         <summary>Registrar resposta recebida</summary>
-        <p class="hint">Cole a resposta do lead (enquanto a leitura automática da caixa não estiver ligada). A IA classifica e sugere o próximo passo.</p>
+        <p class="hint">Respostas por e-mail entram sozinhas pela leitura da caixa. Use aqui para respostas recebidas no LinkedIn (ou um e-mail que não entrou). A IA classifica e prepara a resposta.</p>
+        <select id="in-channel" class="select-sm"><option value="linkedin">Recebida no LinkedIn</option><option value="email">Recebida por e-mail</option></select>
         <input id="in-subject" placeholder="Assunto (opcional)" />
         <textarea id="in-body" rows="4" placeholder="Texto da resposta"></textarea>
         <button class="btn btn-secondary btn-sm" id="in-save"><i data-lucide="mail-plus"></i>Registrar e classificar</button>
@@ -188,6 +216,7 @@ export async function renderConversation(container, opts) {
       const r = await api("POST", `/deals/${opts.dealId}/messages/draft`, {
         agentId: container.querySelector("#conv-agent").value || undefined,
         instruction: container.querySelector("#conv-instruction").value,
+        channel: container.querySelector("#conv-channel").value,
       });
       idle(btn);
       if (!r.ok) return toast(errorMessage(r.data), "error");
@@ -199,7 +228,42 @@ export async function renderConversation(container, opts) {
       draw();
     });
 
-    container.querySelectorAll(".msg-draft").forEach((el) => {
+    container.querySelectorAll(".msg-draft-li").forEach((el) => {
+      const id = el.dataset.id;
+      const text = () => el.querySelector(".draft-body").value;
+      el.querySelector("[data-li=copy]").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(text());
+          toast("Texto copiado. Cole no LinkedIn.", "success");
+        } catch {
+          toast("Selecione e copie o texto (Ctrl+C).", "warning");
+        }
+      });
+      el.querySelector("[data-li=done]").addEventListener("click", async () => {
+        const r = await api("POST", `/messages/${id}/linkedin-done`, { body: text() });
+        if (!r.ok) return toast(errorMessage(r.data), "error");
+        toast("Registrado como enviado pelo LinkedIn.", "success");
+        opts.onChanged?.();
+        draw();
+      });
+      el.querySelector("[data-li=skip]")?.addEventListener("click", async () => {
+        const reason = prompt("Pular esta tarefa? A cadência segue para o próximo passo.\nMotivo (opcional):", "");
+        if (reason === null) return;
+        const r = await api("POST", `/messages/${id}/linkedin-skip`, { reason });
+        if (!r.ok) return toast(errorMessage(r.data), "error");
+        opts.onChanged?.();
+        draw();
+      });
+      el.querySelector("[data-li=discard]")?.addEventListener("click", async () => {
+        if (!confirm("Descartar esta tarefa?")) return;
+        const r = await api("POST", `/messages/${id}/discard`, {});
+        if (!r.ok) return toast(errorMessage(r.data), "error");
+        opts.onChanged?.();
+        draw();
+      });
+    });
+
+    container.querySelectorAll(".msg-draft:not(.msg-draft-li)").forEach((el) => {
       const id = el.dataset.id;
       const payload = () => ({ subject: el.querySelector(".draft-subject").value, body: el.querySelector(".draft-body").value });
       const original = messages.find((m) => m.id === id);
@@ -254,7 +318,7 @@ export async function renderConversation(container, opts) {
       if (!body.trim()) return toast("Cole o texto da resposta.", "error");
       const btn = e.currentTarget;
       busy(btn, "Classificando com IA...");
-      const r = await api("POST", `/deals/${opts.dealId}/messages/inbound`, { subject: container.querySelector("#in-subject").value, body });
+      const r = await api("POST", `/deals/${opts.dealId}/messages/inbound`, { subject: container.querySelector("#in-subject").value, body, channel: container.querySelector("#in-channel").value });
       idle(btn);
       if (!r.ok) return toast(errorMessage(r.data), "error");
       const c = r.data.classification;

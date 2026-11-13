@@ -10,11 +10,12 @@ const ACTIVITY_LABEL = {
   owner_change: () => "Responsável alterado",
   note: (a) => `<div class="note-body">${escapeHtml(a.body)}</div>`,
   message_draft: (a) => `Rascunho gerado pela IA (${escapeHtml(a.meta.agent || "agente")})`,
-  message_sent: (a) => `E-mail ${a.meta.auto ? "enviado automaticamente pela cadência" : a.meta.simulated ? "aprovado (envio simulado)" : "enviado"}${a.meta.step ? ` (passo ${a.meta.step})` : ""}: <strong>${escapeHtml(a.meta.subject || "")}</strong>`,
-  message_received: (a) => `Resposta recebida${a.meta.subject ? `: <strong>${escapeHtml(a.meta.subject)}</strong>` : ""}`,
+  message_sent: (a) => a.meta.channel === "linkedin" ? `Contato feito pelo LinkedIn${a.meta.step ? ` (passo ${a.meta.step})` : ""}` : `E-mail ${a.meta.auto ? "enviado automaticamente pela cadência" : a.meta.simulated ? "aprovado (envio simulado)" : "enviado"}${a.meta.step ? ` (passo ${a.meta.step})` : ""}: <strong>${escapeHtml(a.meta.subject || "")}</strong>`,
+  message_received: (a) => `Resposta recebida${a.meta.channel === "linkedin" ? " pelo LinkedIn" : ""}${a.meta.subject ? `: <strong>${escapeHtml(a.meta.subject)}</strong>` : ""}`,
   ai_classification: (a) => `IA classificou: <strong>${escapeHtml(CATEGORY_LABELS[a.meta.category] || a.meta.category)}</strong> — ${escapeHtml(a.meta.summary || "")}`,
   opt_out: () => "Contato marcado como <strong>não contatar</strong> (opt-out)",
   sourced: (a) => `Captado: ${escapeHtml(a.meta.detail || a.meta.source || "")}`,
+  linkedin_skipped: (a) => `Tarefa de LinkedIn pulada${a.meta.step ? ` (passo ${a.meta.step})` : ""}${a.meta.reason ? `: ${escapeHtml(a.meta.reason)}` : ""}`,
   cadence_started: (a) => `Cadência iniciada (${a.meta.steps} passos)${a.meta.start === "after_sent" ? " — 1º passo já feito pelo e-mail enviado antes; segue do 2º" : a.meta.start === "adopted_draft" ? " — o rascunho já pendente virou o 1º passo" : ""}`,
 };
 

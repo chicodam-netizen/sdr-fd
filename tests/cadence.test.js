@@ -199,6 +199,73 @@ test("e-mail avulso antes da cadência não duplica o 1º contato (enviado ou ra
   assert.equal(e2.status, "active");
 });
 
+test("cadência mista: passos de LinkedIn viram tarefa manual (nunca automática), feito/pular seguem a cadência", async () => {
+  const a = await newAgent("Misto", "auto"); // mesmo em modo autônomo, LinkedIn é manual
+  const steps = [
+    { delayDays: 0, instruction: "Primeiro contato.", channel: "email" },
+    { delayDays: 2, instruction: "Pedido de conexão.", channel: "linkedin_connect" },
+    { delayDays: 3, instruction: "Mensagem no LinkedIn.", channel: "linkedin_message" },
+    { delayDays: 4, instruction: "Follow-up por e-mail.", channel: "email" },
+  ];
+  assert.equal((await gestor("PUT", `/agents/${a.id}/cadence`, { steps: [{ delayDays: 0, channel: "fax" }] })).data.error, "invalid_channel");
+  assert.equal((await gestor("PUT", `/agents/${a.id}/cadence`, { steps })).status, 200);
+  assert.deepEqual((await gestor("GET", `/agents/${a.id}/cadence`)).data.steps.map((s) => s.channel), steps.map((s) => s.channel));
+
+  const d = await newDeal("Empresa Mista", a.id);
+  await sdr("POST", `/deals/${d.id}/enroll`, {});
+  assert.equal((await run()).data.sent, 1); // passo 1: e-mail automático
+  await makeDue(d.id);
+  const r2 = await run();
+  assert.equal(r2.data.sent, 0);
+  assert.equal(r2.data.drafted, 1);
+  const e2 = await enrollmentOf(d.id);
+  assert.equal(e2.currentStep, 2);
+  assert.equal(e2.status, "waiting_approval");
+  // tarefa de LinkedIn fora de Aprovações e dentro da lista do LinkedIn
+  assert.equal((await gestor("GET", "/messages/pending")).data.messages.filter((m) => m.dealId === d.id).length, 0);
+  const tasks = (await sdr("GET", "/linkedin/tasks")).data.tasks.filter((t) => t.dealId === d.id);
+  assert.equal(tasks.length, 1);
+  const t = tasks[0];
+  assert.equal(t.channel, "linkedin");
+  assert.equal(t.ai.kind, "linkedin_connect");
+  assert.equal(t.subject, null);
+  assert.ok(t.body.length <= 300);
+  assert.equal(t.contact.linkedinUrl, null);
+  // não dá para "enviar" pelo sistema
+  assert.equal((await sdr("POST", `/messages/${t.id}/send`, {})).data.error, "linkedin_is_manual");
+  // perfil do contato: só URL do LinkedIn
+  assert.equal((await sdr("POST", `/contacts/${t.contact.id}/linkedin`, { url: "https://evil.com/in/x" })).data.error, "invalid_linkedin_url");
+  const li = await sdr("POST", `/contacts/${t.contact.id}/linkedin`, { url: "linkedin.com/in/fulano-de-tal/?trk=abc" });
+  assert.equal(li.data.linkedinUrl, "https://www.linkedin.com/in/fulano-de-tal");
+  // feito (com texto editado) -> registrado como enviado pelo LinkedIn; cadência agenda o passo 3
+  assert.equal((await sdr("POST", `/messages/${t.id}/linkedin-done`, { body: "Olá! Nota editada." })).status, 200);
+  const sent = (await sdr("GET", `/deals/${d.id}/messages`)).data.messages.find((m) => m.id === t.id);
+  assert.equal(sent.status, "sent");
+  assert.equal(sent.channel, "linkedin");
+  assert.equal(sent.body, "Olá! Nota editada.");
+  const e3 = await enrollmentOf(d.id);
+  assert.equal(e3.currentStep, 3);
+  assert.equal(e3.status, "active");
+  // passo 3 (mensagem) pulado -> segue para o passo 4
+  await makeDue(d.id);
+  await run();
+  const t3 = (await sdr("GET", "/linkedin/tasks")).data.tasks.find((x) => x.dealId === d.id);
+  assert.equal(t3.ai.kind, "linkedin_message");
+  assert.equal((await sdr("POST", `/messages/${t3.id}/linkedin-skip`, { reason: "não aceitou a conexão" })).status, 200);
+  const e4 = await enrollmentOf(d.id);
+  assert.equal(e4.currentStep, 4);
+  assert.equal(e4.status, "active");
+  assert.equal((await sdr("POST", `/messages/${t3.id}/linkedin-done`, {})).data.error, "message_not_draft");
+  // resposta recebida pelo LinkedIn: cadência para e o rascunho de resposta é tarefa de LinkedIn
+  const inb = await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Oi! Podemos marcar uma reunião?", channel: "linkedin" });
+  assert.equal(inb.status, 201);
+  assert.equal((await enrollmentOf(d.id)).status, "replied");
+  const rep = (await sdr("GET", "/linkedin/tasks")).data.tasks.find((x) => x.dealId === d.id);
+  assert.equal(rep.ai.kind, "linkedin_reply");
+  assert.equal(rep.lastInbound.body.includes("reunião"), true);
+  await sdr("POST", `/messages/${rep.id}/discard`, {});
+});
+
 test("funil anda sozinho só nas etapas de rotina; Qualificado fica como sugestão; nunca volta", async () => {
   const a = await newAgent("Etapas", "draft");
   const d = await newDeal("Empresa Etapas", a.id);
