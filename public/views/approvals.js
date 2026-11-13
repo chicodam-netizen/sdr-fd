@@ -17,7 +17,22 @@ function inboundHtml(m) {
     ${i.summary ? `<p class="muted small">Resumo da IA: ${escapeHtml(i.summary)}</p>` : ""}
     ${i.subject ? `<div class="small"><strong>${escapeHtml(i.subject)}</strong></div>` : ""}
     <pre class="lead-reply-body">${escapeHtml(i.body || "")}</pre>
+    ${suggestionHtml(m)}
   </details>`;
+}
+
+// Qualificado/Desqualificado não são automáticos: a sugestão da IA vira um botão.
+function suggestedStage(m) {
+  const kind = m.lastInbound?.suggested;
+  if (!["qualified", "disqualified"].includes(kind) || m.stageKind !== "open") return null;
+  return state.pipelines.find((p) => p.id === m.pipelineId)?.stages.find((s) => s.kind === kind) || null;
+}
+function suggestionHtml(m) {
+  const st = suggestedStage(m);
+  return st
+    ? `<div class="suggest-row"><span class="muted small"><i data-lucide="sparkles"></i> A IA sugere mover o card para <strong>${escapeHtml(st.name)}</strong>.</span>
+        <button type="button" class="btn btn-secondary btn-sm" data-act="apply-stage"><i data-lucide="arrow-right"></i>Mover para “${escapeHtml(st.name)}”</button></div>`
+    : "";
 }
 
 function automationHtml(a) {
@@ -90,6 +105,15 @@ function bindItem(el) {
   el.querySelector("[data-act=open]").addEventListener("click", () =>
     openDeal(m.dealId, { pipelines: state.pipelines, owners: state.owners, user: state.user, onMessagesChanged: load, onDelete: load })
   );
+  el.querySelector("[data-act=apply-stage]")?.addEventListener("click", async () => {
+    const st = suggestedStage(m);
+    if (!st) return;
+    if (st.kind !== "open" && !confirm(`Mover ${m.company} para "${st.name}"? Isso encerra a cadência do card.`)) return;
+    const r = await api("POST", `/deals/${m.dealId}/move`, { stageId: st.id });
+    if (!r.ok) return toast(errorMessage(r.data), "error");
+    toast(`${m.company} movido para ${st.name}.`, "success");
+    load();
+  });
   el.querySelector("[data-act=discard]").addEventListener("click", async () => {
     if (!confirm("Descartar este rascunho?")) return;
     const r = await api("POST", `/messages/${id}/discard`, {});

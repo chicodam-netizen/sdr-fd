@@ -27,11 +27,16 @@ function visibleDeals() {
   });
 }
 
+const SUGGESTION_LABELS = { qualified: "Qualificado", disqualified: "Desqualificado" };
+const suggestionBadge = (d) =>
+  d.aiSuggestion ? `<span class="badge badge-suggest badge-suggest-${d.aiSuggestion}" title="Pela última resposta do lead, a IA sugere mover para ${SUGGESTION_LABELS[d.aiSuggestion]}. Abra o card para aplicar."><i data-lucide="sparkles"></i>IA sugere: ${SUGGESTION_LABELS[d.aiSuggestion]}</span>` : "";
+
 function cardHtml(d) {
   const days = daysSince(d.stageChangedAt);
   return `<article class="deal-card" data-id="${d.id}" tabindex="0">
     <div class="deal-card-title">${escapeHtml(d.company.name)}</div>
     ${d.title !== d.company.name ? `<div class="deal-card-sub">${escapeHtml(d.title)}</div>` : ""}
+    ${d.aiSuggestion ? `<div>${suggestionBadge(d)}</div>` : ""}
     ${d.contact ? `<div class="deal-card-contact"><i data-lucide="user"></i>${escapeHtml(d.contact.name)}${d.contact.optOut ? ` <span class="badge badge-danger">opt-out</span>` : ""}</div>` : ""}
     <div class="deal-card-foot">
       <span class="deal-card-value">${formatMoney(d.value)}</span>
@@ -81,7 +86,7 @@ function listHtml(deals) {
       .map(
         (d) => `<tr data-id="${d.id}">
           ${canManage ? `<td class="col-check"><input type="checkbox" class="row-check" data-id="${d.id}" aria-label="Selecionar ${escapeHtml(d.company.name)}" ${sel.has(d.id) ? "checked" : ""} /></td>` : ""}
-          <td data-label="Empresa"><strong>${escapeHtml(d.company.name)}</strong>${d.company.city ? `<div class="muted small">${escapeHtml([d.company.city, d.company.uf].filter(Boolean).join("/"))}</div>` : ""}</td>
+          <td data-label="Empresa"><strong>${escapeHtml(d.company.name)}</strong>${d.aiSuggestion ? ` ${suggestionBadge(d)}` : ""}${d.company.city ? `<div class="muted small">${escapeHtml([d.company.city, d.company.uf].filter(Boolean).join("/"))}</div>` : ""}</td>
           <td data-label="Contato">${d.contact ? `${escapeHtml(d.contact.name)}${d.contact.email && d.contact.email !== d.contact.name ? `<div class="muted small">${escapeHtml(d.contact.email)}</div>` : ""}` : "—"}</td>
           <td data-label="Etapa"><select class="select-sm stage-select" data-id="${d.id}">${stageOpts(d)}</select></td>
           <td data-label="Cadência">${d.cadenceStatus ? `<span class="badge">${CADENCE_LABELS[d.cadenceStatus]}</span>` : `<span class="muted">—</span>`}</td>

@@ -164,6 +164,40 @@ test("autônomo: envia já no 1º passo; resposta do lead para a cadência e des
   assert.equal((await run()).data.processed, 0);
 });
 
+const stageOf = async (dealId) => {
+  const d = (await gestor("GET", `/deals/${dealId}`)).data.deal;
+  return { name: pipeline.stages.find((s) => s.id === d.stageId).name, suggestion: d.aiSuggestion };
+};
+
+test("funil anda sozinho só nas etapas de rotina; Qualificado fica como sugestão; nunca volta", async () => {
+  const a = await newAgent("Etapas", "draft");
+  const d = await newDeal("Empresa Etapas", a.id);
+  assert.equal((await stageOf(d.id)).name, "Novo lead");
+  await sdr("POST", `/deals/${d.id}/enroll`, {});
+  await run();
+  const first = (await gestor("GET", "/messages/pending")).data.messages.find((m) => m.dealId === d.id);
+  assert.equal((await stageOf(d.id)).name, "Novo lead"); // rascunho não move
+  await sdr("POST", `/messages/${first.id}/send`, {});
+  assert.equal((await stageOf(d.id)).name, "Primeiro contato");
+  await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Estou de férias." });
+  assert.equal((await stageOf(d.id)).name, "Primeiro contato"); // ausência não move
+  await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Vamos marcar uma reunião?" });
+  const st = await stageOf(d.id);
+  assert.equal(st.name, "Em conversa");
+  assert.equal(st.suggestion, "qualified"); // sugestão, não movimento
+  const pend = (await gestor("GET", "/messages/pending")).data.messages.find((m) => m.dealId === d.id);
+  assert.equal(pend.lastInbound.suggested, "qualified");
+  assert.equal(pend.stageKind, "open");
+  const acts = (await gestor("GET", `/deals/${d.id}`)).data.activities || [];
+  if (acts.length) assert.ok(acts.some((x) => x.type === "stage_change" && x.meta.auto));
+  // card movido à mão para frente não volta com novo envio
+  const qualified = pipeline.stages.find((s) => s.kind === "qualified");
+  await sdr("POST", `/deals/${d.id}/move`, { stageId: qualified.id });
+  assert.equal((await stageOf(d.id)).suggestion, null);
+  await sdr("POST", `/deals/${d.id}/messages/inbound`, { body: "Mais uma dúvida" });
+  assert.equal((await stageOf(d.id)).name, "Qualificado");
+});
+
 test("resposta do lead: rascunho de resposta automático com a mensagem do lead; ausência não para a cadência", async () => {
   const a = await newAgent("Resposta", "draft");
   const d = await newDeal("Empresa Resposta", a.id);

@@ -6,7 +6,7 @@ import { renderConversation, CATEGORY_LABELS } from "./conversation.js";
 const ACTIVITY_LABEL = {
   created: () => "Card criado",
   import: (a) => `Importado de ${escapeHtml(a.meta.file || "CSV")}`,
-  stage_change: (a) => `Movido de <strong>${escapeHtml(a.meta.from || "?")}</strong> para <strong>${escapeHtml(a.meta.to)}</strong>`,
+  stage_change: (a) => `${a.meta.auto ? "Movido automaticamente" : "Movido"} de <strong>${escapeHtml(a.meta.from || "?")}</strong> para <strong>${escapeHtml(a.meta.to)}</strong>${a.meta.auto && a.meta.reason ? ` <span class="muted small">(${escapeHtml(a.meta.reason)})</span>` : ""}`,
   owner_change: () => "Responsável alterado",
   note: (a) => `<div class="note-body">${escapeHtml(a.body)}</div>`,
   message_draft: (a) => `Rascunho gerado pela IA (${escapeHtml(a.meta.agent || "agente")})`,

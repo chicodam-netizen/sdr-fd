@@ -500,3 +500,9 @@ code { font-family: Consolas, monospace; font-size: 0.85em; background: #0a1830;
 .lead-reply-body { white-space: pre-wrap; font-family: inherit; font-size: 0.9rem; margin: 6px 0 0; max-height: 260px; overflow: auto; }
 .col-check { width: 36px; text-align: center; }
 .col-check input { width: 16px; height: 16px; cursor: pointer; }
+.badge-suggest { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0; }
+.badge-suggest svg { width: 12px; height: 12px; }
+.badge-suggest-qualified { background: rgba(0, 200, 150, 0.15); color: #6ff0c8; border-color: rgba(0, 200, 150, 0.5); }
+.badge-suggest-disqualified { background: rgba(239, 91, 91, 0.12); color: #ffb3b3; border-color: rgba(239, 91, 91, 0.5); }
+.suggest-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.suggest-row svg { width: 13px; height: 13px; vertical-align: -2px; }
