@@ -169,6 +169,36 @@ const stageOf = async (dealId) => {
   return { name: pipeline.stages.find((s) => s.id === d.stageId).name, suggestion: d.aiSuggestion };
 };
 
+test("e-mail avulso antes da cadência não duplica o 1º contato (enviado ou rascunho pendente)", async () => {
+  const a = await newAgent("Avulso", "draft");
+  const pendingOf = async (id) => (await gestor("GET", "/messages/pending")).data.messages.filter((m) => m.dealId === id);
+  // 1) aprovou e enviou o rascunho avulso, depois iniciou a cadência: começa no passo 2, sem novo e-mail agora
+  const d1 = await newDeal("Avulso Enviado", a.id);
+  const dr = await sdr("POST", `/deals/${d1.id}/messages/draft`, {});
+  await sdr("POST", `/messages/${dr.data.message.id}/send`, {});
+  await sdr("POST", `/deals/${d1.id}/enroll`, {});
+  const e1 = await enrollmentOf(d1.id);
+  assert.equal(e1.currentStep, 2);
+  assert.equal(e1.status, "active");
+  assert.ok(new Date(e1.nextRunAt) > new Date(Date.now() + 2 * 86400000), "2º passo só daqui a ~3 dias");
+  await run();
+  assert.equal((await pendingOf(d1.id)).length, 0);
+  // 2) iniciou a cadência com o rascunho avulso pendente: ele vira o passo 1 (nada duplicado)
+  const d2 = await newDeal("Avulso Pendente", a.id);
+  const dr2 = await sdr("POST", `/deals/${d2.id}/messages/draft`, {});
+  await sdr("POST", `/deals/${d2.id}/enroll`, {});
+  assert.equal((await enrollmentOf(d2.id)).status, "waiting_approval");
+  await run();
+  const p2 = await pendingOf(d2.id);
+  assert.equal(p2.length, 1);
+  assert.equal(p2[0].id, dr2.data.message.id);
+  assert.equal(p2[0].step, 1);
+  await sdr("POST", `/messages/${p2[0].id}/send`, {});
+  const e2 = await enrollmentOf(d2.id);
+  assert.equal(e2.currentStep, 2);
+  assert.equal(e2.status, "active");
+});
+
 test("funil anda sozinho só nas etapas de rotina; Qualificado fica como sugestão; nunca volta", async () => {
   const a = await newAgent("Etapas", "draft");
   const d = await newDeal("Empresa Etapas", a.id);

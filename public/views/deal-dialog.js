@@ -15,7 +15,7 @@ const ACTIVITY_LABEL = {
   ai_classification: (a) => `IA classificou: <strong>${escapeHtml(CATEGORY_LABELS[a.meta.category] || a.meta.category)}</strong> — ${escapeHtml(a.meta.summary || "")}`,
   opt_out: () => "Contato marcado como <strong>não contatar</strong> (opt-out)",
   sourced: (a) => `Captado: ${escapeHtml(a.meta.detail || a.meta.source || "")}`,
-  cadence_started: (a) => `Cadência iniciada (${a.meta.steps} passos)`,
+  cadence_started: (a) => `Cadência iniciada (${a.meta.steps} passos)${a.meta.start === "after_sent" ? " — 1º passo já feito pelo e-mail enviado antes; segue do 2º" : a.meta.start === "adopted_draft" ? " — o rascunho já pendente virou o 1º passo" : ""}`,
 };
 
 const ACTIVITY_ICON = {
