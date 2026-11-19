@@ -85,3 +85,15 @@ module.exports = async (req, res) => {
     sendJson(res, 500, { ok: false, error: "internal_error" });
   }
 };
+
+// Chamada interna (sem HTTP) usada pelo servidor MCP: mesma tabela de rotas, mesmas
+// validações, papéis e auditoria. O usuário já vem resolvido por quem chama.
+module.exports.dispatch = async ({ method, path, query = {}, body = {}, user, ip = "mcp" }) => {
+  const { route, params } = matchRoute(method, path);
+  if (!route || route.public) throw new HttpError(404, "not_found");
+  requireRole(user, route.roles);
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
+  const result = await route.handler({ req: null, res: null, user, params, query: qs, body, ip });
+  return result && result.status ? result.body : result;
+};
