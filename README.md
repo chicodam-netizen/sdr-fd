@@ -89,6 +89,24 @@ Contra o banco de produção só com plano aprovado:
 `CONFIRM_REMOTE_MIGRATION=sim node --env-file=.env.production.local scripts/migrate.js --allow-remote`
 (`--dry-run` lista o que está pendente sem aplicar).
 
+## Produção (Vercel + Neon)
+
+- **Vercel (Hobby)**: importar o repositório; framework "Other", sem build. `vercel.json` manda
+  `/api/*` para a função única `api/index.js` (60 s).
+- **Variáveis de ambiente na Vercel**: `DATABASE_URL` (Neon, pooled, `sslmode=require`),
+  `APP_URL` (endereço público), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `DISCOVERY_MODEL`,
+  `SMTP_*`, `MAIL_ENABLED`, `MAIL_FROM_NAME`, `MAIL_BCC`, `IMAP_*`, `IMAP_LOOKBACK_DAYS`,
+  `CRON_SECRET`, `GOOGLE_PLACES_API_KEY` (opcional). **Não** definir `AUTOMATION_ENABLED`,
+  `MAIL_REDIRECT_TO` nem `AI_FAKE`.
+- **Automação a cada 10 min** (o cron da Vercel Hobby é só diário): agendador externo
+  (ex.: cron-job.org) com dois jobs `GET`, cabeçalho `Authorization: Bearer <CRON_SECRET>`:
+  `<APP_URL>/api/cron/inbox` e `<APP_URL>/api/cron/cadence`. Cada chamada para de iniciar
+  itens após ~25 s; o que sobrar vai na próxima.
+- **Só um ambiente pode enviar e ler a caixa**: com a produção no ar, o local fica com
+  `AUTOMATION_ENABLED=false` e `MAIL_REDIRECT_TO` ativo (ou `MAIL_ENABLED=false`) e sem `IMAP_*`.
+- Banco: cópia inicial do local com `pg_dump`/`pg_restore` (inclui `schema_migrations`);
+  migrações futuras pelo `migrate.js --allow-remote` (seção acima).
+
 ## Segurança
 
 - Senhas com bcrypt; sessão em cookie httpOnly/SameSite=Lax (Secure em https), 12h deslizantes;

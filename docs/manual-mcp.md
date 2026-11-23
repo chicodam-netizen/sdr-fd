@@ -19,7 +19,7 @@ Requisitos para funcionar:
 1. **O banco local (Postgres) precisa estar ligado.** Se o PC reiniciou ou suspendeu, ele para. Peça ao Claude para "subir a aplicação" ou ligue o banco antes.
 2. O servidor web do sistema (`localhost:3100`) **não** é necessário para o MCP, mas continua sendo onde você aprova e envia os e-mails e onde a automação roda.
 
-O Claude age como o usuário **francisco@fdconsultoria.tech** (admin). Tudo o que ele faz fica registrado na auditoria do sistema.
+O Claude age como o seu usuário admin (definido em `MCP_USER_EMAIL`). Tudo o que ele faz fica registrado na auditoria do sistema.
 
 ---
 
@@ -38,7 +38,7 @@ Teste: *"Use o sdr-fd e me mostre o resumo do painel."*
 **Consultas**
 - "Quantos leads estão em cada etapa do funil?"
 - "Mostre os cards que estão em Em conversa e o que o lead respondeu."
-- "Abra o card da Magnesita e resuma o histórico."
+- "Abra o card da Empresa X e resuma o histórico."
 - "Quais rascunhos estão aguardando aprovação?"
 - "Quais tarefas de LinkedIn tenho hoje?"
 - "Relatório dos últimos 30 dias: quantos contatados, quantas respostas, conversão."
@@ -46,13 +46,13 @@ Teste: *"Use o sdr-fd e me mostre o resumo do painel."*
 - "Na base da Receita, procure empresas de software (CNAE 62) em MG que ainda não estão no sistema."
 
 **Ações (ficam como rascunho / registro, sem envio)**
-- "Gere um rascunho de follow-up para a AMC Soluções mencionando o case da indústria X."
-- "Reescreva o rascunho da Metalúrgica Horizonte mais curto e com assunto mais direto."
-- "Adicione uma nota no card da Magnesita: ligar dia 25 às 10h."
-- "Mova o card da Magnesita para Qualificado."
+- "Gere um rascunho de follow-up para a Empresa Y mencionando o case da indústria X."
+- "Reescreva o rascunho da Empresa Z mais curto e com assunto mais direto."
+- "Adicione uma nota no card da Empresa X: ligar dia 25 às 10h."
+- "Mova o card da Empresa X para Qualificado."
 - "Inicie a cadência do agente José para estes 10 cards."
-- "Pause a cadência da A&C Mecatrônica."
-- "O lead da Horizonte me respondeu no LinkedIn: '...'. Registre a resposta."
+- "Pause a cadência da Empresa Y."
+- "O lead da Empresa Z me respondeu no LinkedIn: '...'. Registre a resposta."
 - "Envie ao funil as 20 empresas de maior prioridade de Betim, etapa Novo, com a cadência do José."
 
 Dica: o Claude encontra os IDs sozinho (busca o card/empresa/agente antes). Se houver nomes parecidos, ele pergunta ou mostra as opções.
